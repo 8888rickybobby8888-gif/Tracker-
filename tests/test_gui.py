@@ -136,7 +136,7 @@ except Exception as e:
 
 # ---------------- 4. learn_mask.py over real UDP ----------------
 if os.path.exists("lidar_mask.json"): os.remove("lidar_mask.json")
-proc = subprocess.Popen([sys.executable, "/mnt/user-data/outputs/learn_mask.py"], cwd=os.getcwd(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+proc = subprocess.Popen([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "learn_mask.py")], cwd=os.getcwd(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 time.sleep(1.0)
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); t0 = time.time(); seq = 0
 while time.time() - t0 < 4.6:
