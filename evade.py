@@ -93,6 +93,10 @@ ESCAPE_RELEASE_M = 0.03   # it keeps escaping until it is this much further clea
 ESCAPE_DRIVE = True       # when no opponent is close, drive away from the no-go zone / tape edge (no longer fights the defence)
 SOFT_NOGO_M = 0.30        # HOLD GROUND: while FACING an opponent, from this far out (centre to the no-go zone) ...
 SOFT_TAPE_M = 0.25        # ... or the tape, push back toward the opponent so it can't shove us over the edge
+BACKOFF_SPEED = 28        # cm/s: facing a slower opponent that is in our face, back away from it (it is slower than us, so the gap opens)
+BACKOFF_M = 0.35          # start backing off when its balloon is this close (to our centre) ...
+BACKOFF_RELEASE_M = 0.55  # ... and keep going until the gap is this big, then let the normal chase run (it can't catch us)
+BACKOFF_CLEAR_M = 0.50    # only if there is this much free floor behind us (inside the tape, outside the no-go zone)
 HOLD_SPEED = 0            # cm/s of push at full depth (an opponent shoves at about 10 cm/s)
 ESCAPE_NUDGE = False      # True = while facing an opponent near an edge, also move forward/back away from it.
                           # Tested: it drops survival against a hunter from 12/12 to 5/12, so it stays off.
@@ -434,6 +438,12 @@ class ExternalWatch:
         return any(math.hypot(h[-1][1] - f["x"], h[-1][2] - f["y"]) <= radius_m and t < self._active_until.get(n, -1e9)
                    for n, h in self._opp.items() if h)
 
+    def pop_pending(self, t):
+        """True in the moment right after the LAST opponent vanished right beside us (probably popped, not yet confirmed):
+        stand still instead of searching, so we don't wander into the tape while the camera makes up its mind."""
+        return (bool(self._status) and not self._opp and all(s == "popped" for s in self._status.values())
+                and t - self._gone_t < ALL_POPPED_CONFIRM_S)
+
     def all_popped(self, t):
         """True once EVERY opponent we have seen has vanished right beside us (popped) and none has been back in view for
         ALL_POPPED_CONFIRM_S. Any one that vanished far off (maybe just hidden) or reappears makes it False again."""
@@ -455,6 +465,13 @@ class ExternalWatch:
         if near:
             return all(t >= self._active_until.get(n, -1e9) for n in near)
         return any(math.hypot(gx - ox, gy - oy) <= LIDAR_MATCH_M for gx, gy in self._ghosts)
+
+    def distance(self, name):
+        """Floor distance from the follower's centre to the opponent's tracked balloon, or None."""
+        f, h = self._follower, self._opp.get(name)
+        if f is None or not h:
+            return None
+        return math.hypot(h[-1][1] - f["x"], h[-1][2] - f["y"])
 
     def any_within(self, radius_m):
         """True if any currently tracked opponent is within radius_m of the follower."""
@@ -690,6 +707,7 @@ class Brain:
         self.facing = FacingTracker(motors, clock) if (TRACK_FACING and motors is not None and hasattr(motors, "write")) else None
         self._last_mode = None
         self.defended_who = ""                               # last opponent we had to defend against (the planner retargets it)
+        self._backing = False                                # backing off from a slower opponent in our face
         self.paused = False                                  # the PAUSE button: wheels stopped, nothing else runs
         self._park_t = -1e9
 
@@ -757,7 +775,7 @@ class Brain:
             lid = Threat()          # the camera says that object is an opponent that is parked or already popped: it can't
                                     # pop us unless WE swing our balloon into its pin, and turning away is exactly that move
         threat = self.fuse(lid, self.external.state(now) if self.external else Threat())
-        if not threat.active and self.external is not None and self.external.all_popped(now):
+        if not threat.active and self.external is not None and (self.external.all_popped(now) or self.external.pop_pending(now)):
             return self._park("done")                      # every opponent is popped: the game is won, stand still
         facing_now = (threat.active and self.facing is not None and threat.source in ("external", "both")
                       and bool(threat.who))
@@ -784,6 +802,14 @@ class Brain:
                     soft = self.guard.edge_push(now)               # near an edge with an opponent in our face: hold our ground
                     if soft is not None:
                         nudge += HOLD_SPEED * soft["depth"] * math.cos(math.radians(wrap(soft["away"] - soft["yaw"])))
+                if BACKOFF_SPEED and self.guard is not None and hasattr(self.guard, "clear_behind"):
+                    d = self.external.distance(threat.who) if self.external is not None else None
+                    if d is not None and (d < BACKOFF_M or (self._backing and d < BACKOFF_RELEASE_M)):
+                        self._backing = self.guard.clear_behind(now, BACKOFF_CLEAR_M)
+                    else:
+                        self._backing = False
+                    if self._backing:
+                        nudge = -min(BACKOFF_SPEED, evade_speed())      # reverse, still facing it, until it falls behind
                 self.facing.step(theta, now, nudge)
                 self._last_mode = "track"
                 return "track"

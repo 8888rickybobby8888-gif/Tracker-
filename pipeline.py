@@ -127,6 +127,20 @@ class Pipeline:
         rover is too close to the no-go zone or the tape. Needs the arena (arena.json), else it never triggers."""
         return self._edge(now, evade.ESCAPE_NOGO_M, evade.ESCAPE_TAPE_M, True)
 
+    def clear_behind(self, now, dist_m):
+        """True if the floor dist_m straight behind the rover is free: inside the tape (with the planner's margins) and clear
+        of the no-go zone. False when unknown (no arena or a stale pose)."""
+        if self.planner is None or self.pose is None or now - self.pose[3] > 0.6:
+            return False
+        x, y, yaw, _ = self.pose
+        for k in range(1, int(dist_m / 0.05) + 1):
+            p = np.array([x - k * 0.05 * math.cos(math.radians(yaw)), y - k * 0.05 * math.sin(math.radians(yaw))])
+            if not pl.inside(self.planner.free, p):
+                return False
+            if self.planner.block is not None and pl.inside(self.planner.block, p):
+                return False
+        return True
+
     def edge_push(self, now):
         """HOLD-GROUND zone: like escape() but starting further out (SOFT_*_M), and with "depth" 0..1 = how deep into that
         zone we are. Used while facing an opponent that is shoving us toward an edge."""
