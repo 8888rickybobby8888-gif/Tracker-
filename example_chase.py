@@ -20,5 +20,5 @@ def chase(yaw):
         w = max(-20, min(20, 0.5 * yaw))            # + yaw = target on the left = turn left = left wheel back, right forward
         Motors.write(-w, w)
     else:                                           # roughly lined up: drive, steering gently toward it
-        steer = max(-10, min(10, 0.5 * yaw))         # + yaw: slow the left wheel
+        steer = max(-7, min(7, 0.5 * yaw))         # + yaw: slow the left wheel
         Motors.write(22 - steer, 22 + steer)
