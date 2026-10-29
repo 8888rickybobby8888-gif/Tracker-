@@ -1,0 +1,224 @@
+{
+ "chase_around": [
+  {
+   "seed": 0,
+   "goal": true,
+   "popped": false,
+   "t": 10.7,
+   "evades": 0,
+   "tape": 0,
+   "nogo": 0
+  },
+  {
+   "seed": 1,
+   "goal": true,
+   "popped": false,
+   "t": 10.7,
+   "evades": 0,
+   "tape": 0,
+   "nogo": 0
+  },
+  {
+   "seed": 2,
+   "goal": true,
+   "popped": false,
+   "t": 11.2,
+   "evades": 0,
+   "tape": 0,
+   "nogo": 0
+  },
+  {
+   "seed": 3,
+   "goal": true,
+   "popped": false,
+   "t": 10.9,
+   "evades": 0,
+   "tape": 0,
+   "nogo": 0
+  },
+  {
+   "seed": 4,
+   "goal": true,
+   "popped": false,
+   "t": 11.8,
+   "evades": 0,
+   "tape": 0,
+   "nogo": 0
+  },
+  {
+   "seed": 5,
+   "goal": true,
+   "popped": false,
+   "t": 11.2,
+   "evades": 0,
+   "tape": 0,
+   "nogo": 0
+  },
+  {
+   "seed": 6,
+   "goal": true,
+   "popped": false,
+   "t": 11.2,
+   "evades": 0,
+   "tape": 0,
+   "nogo": 0
+  },
+  {
+   "seed": 7,
+   "goal": true,
+   "popped": false,
+   "t": 7.8,
+   "evades": 0,
+   "tape": 0,
+   "nogo": 0
+  }
+ ],
+ "start_beside_nogo": [
+  {
+   "seed": 0,
+   "goal": true,
+   "popped": false,
+   "t": 11.4,
+   "evades": 0,
+   "tape": 0,
+   "nogo": 0
+  },
+  {
+   "seed": 1,
+   "goal": true,
+   "popped": false,
+   "t": 6.0,
+   "evades": 0,
+   "tape": 0,
+   "nogo": 0
+  },
+  {
+   "seed": 2,
+   "goal": true,
+   "popped": false,
+   "t": 12.2,
+   "evades": 0,
+   "tape": 0,
+   "nogo": 0
+  },
+  {
+   "seed": 3,
+   "goal": true,
+   "popped": false,
+   "t": 6.5,
+   "evades": 0,
+   "tape": 0,
+   "nogo": 0
+  },
+  {
+   "seed": 4,
+   "goal": true,
+   "popped": false,
+   "t": 6.9,
+   "evades": 0,
+   "tape": 0,
+   "nogo": 0
+  },
+  {
+   "seed": 5,
+   "goal": true,
+   "popped": false,
+   "t": 6.7,
+   "evades": 0,
+   "tape": 0,
+   "nogo": 0
+  },
+  {
+   "seed": 6,
+   "goal": true,
+   "popped": false,
+   "t": 5.3,
+   "evades": 0,
+   "tape": 0,
+   "nogo": 0
+  },
+  {
+   "seed": 7,
+   "goal": true,
+   "popped": false,
+   "t": 9.9,
+   "evades": 0,
+   "tape": 0,
+   "nogo": 0
+  }
+ ],
+ "three_calm": [
+  {
+   "seed": 0,
+   "goal": false,
+   "popped": false,
+   "t": 40.0,
+   "evades": 5,
+   "tape": 0,
+   "nogo": 0
+  },
+  {
+   "seed": 1,
+   "goal": false,
+   "popped": false,
+   "t": 40.0,
+   "evades": 5,
+   "tape": 42,
+   "nogo": 0
+  },
+  {
+   "seed": 2,
+   "goal": false,
+   "popped": false,
+   "t": 40.0,
+   "evades": 5,
+   "tape": 111,
+   "nogo": 0
+  },
+  {
+   "seed": 3,
+   "goal": false,
+   "popped": false,
+   "t": 40.0,
+   "evades": 11,
+   "tape": 0,
+   "nogo": 0
+  },
+  {
+   "seed": 4,
+   "goal": false,
+   "popped": false,
+   "t": 40.0,
+   "evades": 7,
+   "tape": 105,
+   "nogo": 0
+  },
+  {
+   "seed": 5,
+   "goal": false,
+   "popped": false,
+   "t": 40.0,
+   "evades": 8,
+   "tape": 20,
+   "nogo": 0
+  },
+  {
+   "seed": 6,
+   "goal": false,
+   "popped": false,
+   "t": 40.0,
+   "evades": 7,
+   "tape": 49,
+   "nogo": 0
+  },
+  {
+   "seed": 7,
+   "goal": false,
+   "popped": false,
+   "t": 40.0,
+   "evades": 4,
+   "tape": 175,
+   "nogo": 0
+  }
+ ]
+}

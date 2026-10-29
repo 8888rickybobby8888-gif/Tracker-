@@ -1,0 +1,1290 @@
+{
+ "hunter 0.11, target": [
+  {
+   "seed": 0,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 1404,
+   "nogo": 0,
+   "evades": 49
+  },
+  {
+   "seed": 1,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 1078,
+   "nogo": 0,
+   "evades": 44
+  },
+  {
+   "seed": 2,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 1052,
+   "nogo": 0,
+   "evades": 54
+  },
+  {
+   "seed": 3,
+   "survived": true,
+   "won": false,
+   "t": 60.5,
+   "tape": 0,
+   "nogo": 233,
+   "evades": 27
+  },
+  {
+   "seed": 4,
+   "survived": true,
+   "won": true,
+   "t": 46.5,
+   "tape": 0,
+   "nogo": 107,
+   "evades": 12
+  },
+  {
+   "seed": 5,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 823,
+   "nogo": 0,
+   "evades": 38
+  },
+  {
+   "seed": 6,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 967,
+   "nogo": 0,
+   "evades": 49
+  },
+  {
+   "seed": 7,
+   "survived": true,
+   "won": true,
+   "t": 53.6,
+   "tape": 0,
+   "nogo": 324,
+   "evades": 20
+  },
+  {
+   "seed": 8,
+   "survived": true,
+   "won": false,
+   "t": 60.2,
+   "tape": 0,
+   "nogo": 375,
+   "evades": 32
+  },
+  {
+   "seed": 9,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 928,
+   "nogo": 0,
+   "evades": 45
+  }
+ ],
+ "hunter 0.08, target": [
+  {
+   "seed": 0,
+   "survived": true,
+   "won": true,
+   "t": 57.5,
+   "tape": 0,
+   "nogo": 298,
+   "evades": 20
+  },
+  {
+   "seed": 1,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 20
+  },
+  {
+   "seed": 2,
+   "survived": false,
+   "won": false,
+   "t": 20.7,
+   "tape": 0,
+   "nogo": 14,
+   "evades": 1
+  },
+  {
+   "seed": 3,
+   "survived": false,
+   "won": false,
+   "t": 59.7,
+   "tape": 641,
+   "nogo": 0,
+   "evades": 39
+  },
+  {
+   "seed": 4,
+   "survived": true,
+   "won": false,
+   "t": 60.8,
+   "tape": 0,
+   "nogo": 109,
+   "evades": 14
+  },
+  {
+   "seed": 5,
+   "survived": false,
+   "won": false,
+   "t": 16.7,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 1
+  },
+  {
+   "seed": 6,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 787,
+   "nogo": 0,
+   "evades": 37
+  },
+  {
+   "seed": 7,
+   "survived": true,
+   "won": false,
+   "t": 60.4,
+   "tape": 0,
+   "nogo": 107,
+   "evades": 20
+  },
+  {
+   "seed": 8,
+   "survived": false,
+   "won": false,
+   "t": 42.3,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 24
+  },
+  {
+   "seed": 9,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 627,
+   "nogo": 0,
+   "evades": 41
+  }
+ ],
+ "hunter 0.15, target": [
+  {
+   "seed": 0,
+   "survived": true,
+   "won": false,
+   "t": 60.3,
+   "tape": 0,
+   "nogo": 256,
+   "evades": 25
+  },
+  {
+   "seed": 1,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 990,
+   "nogo": 0,
+   "evades": 57
+  },
+  {
+   "seed": 2,
+   "survived": true,
+   "won": false,
+   "t": 60.5,
+   "tape": 0,
+   "nogo": 265,
+   "evades": 26
+  },
+  {
+   "seed": 3,
+   "survived": true,
+   "won": false,
+   "t": 60.5,
+   "tape": 680,
+   "nogo": 336,
+   "evades": 48
+  },
+  {
+   "seed": 4,
+   "survived": true,
+   "won": false,
+   "t": 60.8,
+   "tape": 383,
+   "nogo": 190,
+   "evades": 37
+  },
+  {
+   "seed": 5,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 1096,
+   "nogo": 0,
+   "evades": 52
+  },
+  {
+   "seed": 6,
+   "survived": true,
+   "won": true,
+   "t": 51.9,
+   "tape": 0,
+   "nogo": 244,
+   "evades": 25
+  },
+  {
+   "seed": 7,
+   "survived": true,
+   "won": false,
+   "t": 60.5,
+   "tape": 0,
+   "nogo": 154,
+   "evades": 31
+  },
+  {
+   "seed": 8,
+   "survived": true,
+   "won": true,
+   "t": 56.7,
+   "tape": 0,
+   "nogo": 212,
+   "evades": 16
+  },
+  {
+   "seed": 9,
+   "survived": true,
+   "won": false,
+   "t": 60.3,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 25
+  }
+ ],
+ "hunter 0.20, target": [
+  {
+   "seed": 0,
+   "survived": true,
+   "won": false,
+   "t": 60.2,
+   "tape": 0,
+   "nogo": 238,
+   "evades": 27
+  },
+  {
+   "seed": 1,
+   "survived": true,
+   "won": false,
+   "t": 60.1,
+   "tape": 677,
+   "nogo": 68,
+   "evades": 58
+  },
+  {
+   "seed": 2,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 661,
+   "nogo": 0,
+   "evades": 81
+  },
+  {
+   "seed": 3,
+   "survived": true,
+   "won": false,
+   "t": 60.6,
+   "tape": 0,
+   "nogo": 802,
+   "evades": 54
+  },
+  {
+   "seed": 4,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 1250,
+   "nogo": 0,
+   "evades": 85
+  },
+  {
+   "seed": 5,
+   "survived": false,
+   "won": false,
+   "t": 15.7,
+   "tape": 30,
+   "nogo": 0,
+   "evades": 13
+  },
+  {
+   "seed": 6,
+   "survived": true,
+   "won": false,
+   "t": 60.2,
+   "tape": 308,
+   "nogo": 224,
+   "evades": 82
+  },
+  {
+   "seed": 7,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 874,
+   "nogo": 0,
+   "evades": 84
+  },
+  {
+   "seed": 8,
+   "survived": true,
+   "won": true,
+   "t": 37.9,
+   "tape": 0,
+   "nogo": 130,
+   "evades": 15
+  },
+  {
+   "seed": 9,
+   "survived": false,
+   "won": false,
+   "t": 55.3,
+   "tape": 861,
+   "nogo": 0,
+   "evades": 79
+  }
+ ],
+ "hunter 0.30 (as fast as us)": [
+  {
+   "seed": 0,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 846,
+   "nogo": 0,
+   "evades": 112
+  },
+  {
+   "seed": 1,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 235,
+   "nogo": 0,
+   "evades": 112
+  },
+  {
+   "seed": 2,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 113
+  },
+  {
+   "seed": 3,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 649,
+   "nogo": 0,
+   "evades": 116
+  },
+  {
+   "seed": 4,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 938,
+   "nogo": 0,
+   "evades": 111
+  },
+  {
+   "seed": 5,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 737,
+   "nogo": 0,
+   "evades": 115
+  },
+  {
+   "seed": 6,
+   "survived": true,
+   "won": false,
+   "t": 60.1,
+   "tape": 992,
+   "nogo": 0,
+   "evades": 115
+  },
+  {
+   "seed": 7,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 637,
+   "nogo": 0,
+   "evades": 103
+  },
+  {
+   "seed": 8,
+   "survived": true,
+   "won": false,
+   "t": 60.1,
+   "tape": 1017,
+   "nogo": 0,
+   "evades": 114
+  },
+  {
+   "seed": 9,
+   "survived": true,
+   "won": false,
+   "t": 60.1,
+   "tape": 826,
+   "nogo": 0,
+   "evades": 111
+  }
+ ],
+ "hunter 0.11, NO target (pure survival)": [
+  {
+   "seed": 0,
+   "survived": true,
+   "won": false,
+   "t": 60.4,
+   "tape": 0,
+   "nogo": 1051,
+   "evades": 13
+  },
+  {
+   "seed": 1,
+   "survived": true,
+   "won": false,
+   "t": 60.3,
+   "tape": 0,
+   "nogo": 1068,
+   "evades": 19
+  },
+  {
+   "seed": 2,
+   "survived": true,
+   "won": false,
+   "t": 60.4,
+   "tape": 492,
+   "nogo": 717,
+   "evades": 33
+  },
+  {
+   "seed": 3,
+   "survived": false,
+   "won": false,
+   "t": 18.6,
+   "tape": 0,
+   "nogo": 33,
+   "evades": 10
+  },
+  {
+   "seed": 4,
+   "survived": true,
+   "won": false,
+   "t": 60.5,
+   "tape": 0,
+   "nogo": 1299,
+   "evades": 20
+  },
+  {
+   "seed": 5,
+   "survived": false,
+   "won": false,
+   "t": 15.7,
+   "tape": 21,
+   "nogo": 0,
+   "evades": 3
+  },
+  {
+   "seed": 6,
+   "survived": true,
+   "won": false,
+   "t": 60.6,
+   "tape": 0,
+   "nogo": 1248,
+   "evades": 22
+  },
+  {
+   "seed": 7,
+   "survived": true,
+   "won": false,
+   "t": 60.4,
+   "tape": 0,
+   "nogo": 1374,
+   "evades": 18
+  },
+  {
+   "seed": 8,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 1094,
+   "nogo": 0,
+   "evades": 30
+  },
+  {
+   "seed": 9,
+   "survived": true,
+   "won": false,
+   "t": 60.7,
+   "tape": 0,
+   "nogo": 1334,
+   "evades": 11
+  }
+ ],
+ "hunter 0.20, NO target (pure survival)": [
+  {
+   "seed": 0,
+   "survived": true,
+   "won": false,
+   "t": 60.1,
+   "tape": 0,
+   "nogo": 1049,
+   "evades": 46
+  },
+  {
+   "seed": 1,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 1115,
+   "nogo": 0,
+   "evades": 77
+  },
+  {
+   "seed": 2,
+   "survived": true,
+   "won": false,
+   "t": 60.6,
+   "tape": 0,
+   "nogo": 1228,
+   "evades": 58
+  },
+  {
+   "seed": 3,
+   "survived": true,
+   "won": false,
+   "t": 60.1,
+   "tape": 0,
+   "nogo": 1374,
+   "evades": 40
+  },
+  {
+   "seed": 4,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 1261,
+   "nogo": 0,
+   "evades": 90
+  },
+  {
+   "seed": 5,
+   "survived": false,
+   "won": false,
+   "t": 14.3,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 2
+  },
+  {
+   "seed": 6,
+   "survived": true,
+   "won": false,
+   "t": 60.2,
+   "tape": 0,
+   "nogo": 1147,
+   "evades": 33
+  },
+  {
+   "seed": 7,
+   "survived": true,
+   "won": false,
+   "t": 60.1,
+   "tape": 1099,
+   "nogo": 0,
+   "evades": 81
+  },
+  {
+   "seed": 8,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 1053,
+   "nogo": 0,
+   "evades": 84
+  },
+  {
+   "seed": 9,
+   "survived": true,
+   "won": false,
+   "t": 60.1,
+   "tape": 571,
+   "nogo": 0,
+   "evades": 86
+  }
+ ],
+ "hunter starts behind us": [
+  {
+   "seed": 0,
+   "survived": true,
+   "won": false,
+   "t": 60.1,
+   "tape": 0,
+   "nogo": 337,
+   "evades": 41
+  },
+  {
+   "seed": 1,
+   "survived": true,
+   "won": false,
+   "t": 60.7,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 23
+  },
+  {
+   "seed": 2,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 1439,
+   "nogo": 0,
+   "evades": 60
+  },
+  {
+   "seed": 3,
+   "survived": false,
+   "won": false,
+   "t": 41.4,
+   "tape": 532,
+   "nogo": 0,
+   "evades": 34
+  },
+  {
+   "seed": 4,
+   "survived": true,
+   "won": true,
+   "t": 51.7,
+   "tape": 0,
+   "nogo": 91,
+   "evades": 15
+  },
+  {
+   "seed": 5,
+   "survived": true,
+   "won": true,
+   "t": 50.7,
+   "tape": 0,
+   "nogo": 315,
+   "evades": 17
+  },
+  {
+   "seed": 6,
+   "survived": true,
+   "won": true,
+   "t": 57.1,
+   "tape": 0,
+   "nogo": 364,
+   "evades": 29
+  },
+  {
+   "seed": 7,
+   "survived": true,
+   "won": false,
+   "t": 60.3,
+   "tape": 0,
+   "nogo": 440,
+   "evades": 44
+  },
+  {
+   "seed": 8,
+   "survived": true,
+   "won": false,
+   "t": 60.2,
+   "tape": 0,
+   "nogo": 818,
+   "evades": 41
+  },
+  {
+   "seed": 9,
+   "survived": true,
+   "won": true,
+   "t": 46.3,
+   "tape": 0,
+   "nogo": 124,
+   "evades": 23
+  }
+ ],
+ "two hunters 0.11 + target": [
+  {
+   "seed": 0,
+   "survived": false,
+   "won": false,
+   "t": 7.2,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 1
+  },
+  {
+   "seed": 1,
+   "survived": false,
+   "won": false,
+   "t": 8.2,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 1
+  },
+  {
+   "seed": 2,
+   "survived": false,
+   "won": false,
+   "t": 5.9,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 1
+  },
+  {
+   "seed": 3,
+   "survived": false,
+   "won": false,
+   "t": 7.2,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 1
+  },
+  {
+   "seed": 4,
+   "survived": false,
+   "won": false,
+   "t": 6.2,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 1
+  },
+  {
+   "seed": 5,
+   "survived": false,
+   "won": false,
+   "t": 6.7,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 1
+  },
+  {
+   "seed": 6,
+   "survived": false,
+   "won": false,
+   "t": 7.0,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 1
+  },
+  {
+   "seed": 7,
+   "survived": true,
+   "won": false,
+   "t": 60.1,
+   "tape": 1468,
+   "nogo": 0,
+   "evades": 85
+  },
+  {
+   "seed": 8,
+   "survived": false,
+   "won": false,
+   "t": 6.9,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 1
+  },
+  {
+   "seed": 9,
+   "survived": false,
+   "won": false,
+   "t": 6.0,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 1
+  }
+ ],
+ "hunter, camera noise x2": [
+  {
+   "seed": 0,
+   "survived": false,
+   "won": false,
+   "t": 13.8,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 3
+  },
+  {
+   "seed": 1,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 0,
+   "nogo": 101,
+   "evades": 33
+  },
+  {
+   "seed": 2,
+   "survived": false,
+   "won": false,
+   "t": 17.9,
+   "tape": 158,
+   "nogo": 0,
+   "evades": 10
+  },
+  {
+   "seed": 3,
+   "survived": false,
+   "won": false,
+   "t": 35.1,
+   "tape": 724,
+   "nogo": 0,
+   "evades": 31
+  },
+  {
+   "seed": 4,
+   "survived": false,
+   "won": false,
+   "t": 21.2,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 21
+  },
+  {
+   "seed": 5,
+   "survived": false,
+   "won": false,
+   "t": 17.3,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 4
+  },
+  {
+   "seed": 6,
+   "survived": false,
+   "won": false,
+   "t": 26.0,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 16
+  },
+  {
+   "seed": 7,
+   "survived": true,
+   "won": false,
+   "t": 60.6,
+   "tape": 0,
+   "nogo": 177,
+   "evades": 17
+  },
+  {
+   "seed": 8,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 600,
+   "nogo": 0,
+   "evades": 69
+  },
+  {
+   "seed": 9,
+   "survived": true,
+   "won": false,
+   "t": 60.6,
+   "tape": 0,
+   "nogo": 567,
+   "evades": 31
+  }
+ ],
+ "hunter, 15% camera dropouts": [
+  {
+   "seed": 0,
+   "survived": true,
+   "won": false,
+   "t": 60.7,
+   "tape": 0,
+   "nogo": 522,
+   "evades": 14
+  },
+  {
+   "seed": 1,
+   "survived": false,
+   "won": false,
+   "t": 10.9,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 4
+  },
+  {
+   "seed": 2,
+   "survived": false,
+   "won": false,
+   "t": 18.2,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 6
+  },
+  {
+   "seed": 3,
+   "survived": false,
+   "won": false,
+   "t": 19.5,
+   "tape": 148,
+   "nogo": 0,
+   "evades": 2
+  },
+  {
+   "seed": 4,
+   "survived": false,
+   "won": false,
+   "t": 13.6,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 1
+  },
+  {
+   "seed": 5,
+   "survived": false,
+   "won": false,
+   "t": 58.0,
+   "tape": 389,
+   "nogo": 0,
+   "evades": 20
+  },
+  {
+   "seed": 6,
+   "survived": true,
+   "won": true,
+   "t": 54.8,
+   "tape": 0,
+   "nogo": 205,
+   "evades": 22
+  },
+  {
+   "seed": 7,
+   "survived": false,
+   "won": false,
+   "t": 26.2,
+   "tape": 0,
+   "nogo": 115,
+   "evades": 7
+  },
+  {
+   "seed": 8,
+   "survived": false,
+   "won": false,
+   "t": 14.2,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 5
+  },
+  {
+   "seed": 9,
+   "survived": false,
+   "won": false,
+   "t": 22.0,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 2
+  }
+ ],
+ "hunter, slow camera (0.30 s)": [
+  {
+   "seed": 0,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 1335,
+   "nogo": 0,
+   "evades": 50
+  },
+  {
+   "seed": 1,
+   "survived": false,
+   "won": false,
+   "t": 8.9,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 0
+  },
+  {
+   "seed": 2,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 1130,
+   "nogo": 0,
+   "evades": 58
+  },
+  {
+   "seed": 3,
+   "survived": true,
+   "won": false,
+   "t": 60.7,
+   "tape": 0,
+   "nogo": 241,
+   "evades": 31
+  },
+  {
+   "seed": 4,
+   "survived": true,
+   "won": true,
+   "t": 46.5,
+   "tape": 0,
+   "nogo": 250,
+   "evades": 17
+  },
+  {
+   "seed": 5,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 870,
+   "nogo": 0,
+   "evades": 51
+  },
+  {
+   "seed": 6,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 952,
+   "nogo": 0,
+   "evades": 53
+  },
+  {
+   "seed": 7,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 947,
+   "nogo": 0,
+   "evades": 37
+  },
+  {
+   "seed": 8,
+   "survived": true,
+   "won": true,
+   "t": 52.4,
+   "tape": 0,
+   "nogo": 70,
+   "evades": 18
+  },
+  {
+   "seed": 9,
+   "survived": false,
+   "won": false,
+   "t": 36.6,
+   "tape": 145,
+   "nogo": 0,
+   "evades": 26
+  }
+ ],
+ "hunter, no lidar": [
+  {
+   "seed": 0,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 1404,
+   "nogo": 0,
+   "evades": 49
+  },
+  {
+   "seed": 1,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 1078,
+   "nogo": 0,
+   "evades": 44
+  },
+  {
+   "seed": 2,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 1052,
+   "nogo": 0,
+   "evades": 54
+  },
+  {
+   "seed": 3,
+   "survived": true,
+   "won": true,
+   "t": 59.3,
+   "tape": 0,
+   "nogo": 233,
+   "evades": 24
+  },
+  {
+   "seed": 4,
+   "survived": true,
+   "won": true,
+   "t": 46.5,
+   "tape": 0,
+   "nogo": 107,
+   "evades": 12
+  },
+  {
+   "seed": 5,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 823,
+   "nogo": 0,
+   "evades": 38
+  },
+  {
+   "seed": 6,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 967,
+   "nogo": 0,
+   "evades": 49
+  },
+  {
+   "seed": 7,
+   "survived": true,
+   "won": true,
+   "t": 53.6,
+   "tape": 0,
+   "nogo": 324,
+   "evades": 20
+  },
+  {
+   "seed": 8,
+   "survived": true,
+   "won": false,
+   "t": 60.1,
+   "tape": 0,
+   "nogo": 375,
+   "evades": 30
+  },
+  {
+   "seed": 9,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 928,
+   "nogo": 0,
+   "evades": 45
+  }
+ ],
+ "hunter, speed cap 15": [
+  {
+   "seed": 0,
+   "survived": true,
+   "won": false,
+   "t": 60.1,
+   "tape": 1114,
+   "nogo": 0,
+   "evades": 42
+  },
+  {
+   "seed": 1,
+   "survived": true,
+   "won": false,
+   "t": 60.5,
+   "tape": 0,
+   "nogo": 504,
+   "evades": 25
+  },
+  {
+   "seed": 2,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 1440,
+   "nogo": 0,
+   "evades": 48
+  },
+  {
+   "seed": 3,
+   "survived": true,
+   "won": false,
+   "t": 60.0,
+   "tape": 665,
+   "nogo": 0,
+   "evades": 46
+  },
+  {
+   "seed": 4,
+   "survived": true,
+   "won": false,
+   "t": 60.6,
+   "tape": 0,
+   "nogo": 277,
+   "evades": 20
+  },
+  {
+   "seed": 5,
+   "survived": true,
+   "won": false,
+   "t": 60.6,
+   "tape": 0,
+   "nogo": 231,
+   "evades": 17
+  },
+  {
+   "seed": 6,
+   "survived": true,
+   "won": true,
+   "t": 58.8,
+   "tape": 0,
+   "nogo": 103,
+   "evades": 16
+  },
+  {
+   "seed": 7,
+   "survived": true,
+   "won": true,
+   "t": 55.1,
+   "tape": 0,
+   "nogo": 196,
+   "evades": 17
+  },
+  {
+   "seed": 8,
+   "survived": true,
+   "won": false,
+   "t": 60.2,
+   "tape": 398,
+   "nogo": 209,
+   "evades": 30
+  },
+  {
+   "seed": 9,
+   "survived": false,
+   "won": false,
+   "t": 14.4,
+   "tape": 0,
+   "nogo": 0,
+   "evades": 1
+  }
+ ]
+}
