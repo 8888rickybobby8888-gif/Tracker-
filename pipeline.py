@@ -50,6 +50,16 @@ class Pipeline:
         self.yaw_to_target = yaw if target_yaw == "same" else target_yaw
         self.publish(self.yaw_to_leader, self.yaw_to_target)
 
+    def pause(self):
+        self.brain.paused = True
+
+    def resume(self):
+        self.brain.paused = False
+
+    def toggle_pause(self):
+        self.brain.paused = not self.brain.paused
+        return self.brain.paused
+
     def on_yaw(self, yaw):
         self._set(yaw)
 
@@ -115,34 +125,50 @@ class Pipeline:
     def escape(self, now):
         """BOUNDARY ESCAPE: None, or {"away": heading in degrees that leads out of trouble, "yaw": our heading} when the
         rover is too close to the no-go zone or the tape. Needs the arena (arena.json), else it never triggers."""
+        return self._edge(now, evade.ESCAPE_NOGO_M, evade.ESCAPE_TAPE_M, True)
+
+    def edge_push(self, now):
+        """HOLD-GROUND zone: like escape() but starting further out (SOFT_*_M), and with "depth" 0..1 = how deep into that
+        zone we are. Used while facing an opponent that is shoving us toward an edge."""
+        return self._edge(now, evade.SOFT_NOGO_M, evade.SOFT_TAPE_M, False)
+
+    def _edge(self, now, nogo_m, tape_m, latch):
         if self.planner is None or self.pose is None or now - self.pose[3] > 0.6:
             return None
-        x, y, yaw, _ = self.pose
+        x, y, yaw, t_pose = self.pose
+        if self.motion is not None:                    # the camera pose is old (image + processing delay): where are we NOW?
+            left, right = self.motion()
+            lead = (now - t_pose) + evade.POSE_LAG_S
+            x += (left + right) / 200.0 * math.cos(math.radians(yaw)) * lead
+            y += (left + right) / 200.0 * math.sin(math.radians(yaw)) * lead
         p = np.array([x, y])
         arena = self.planner.arena
-        rel = evade.ESCAPE_RELEASE_M if self._escaping else 0.0
+        rel = evade.ESCAPE_RELEASE_M if (latch and self._escaping) else 0.0
         away = np.zeros(2)
         if arena.nogo:
             c = pl._closest_on_boundary(arena.nogo, p)
             inside = pl.inside(arena.nogo, p)
             d = 0.0 if inside else float(np.linalg.norm(p - c))
-            thr = evade.ESCAPE_NOGO_M + rel
+            thr = nogo_m + rel
             if d < thr:
                 v = (p - np.mean(pl.ccw(arena.nogo), axis=0)) if inside else (p - c)
                 n = float(np.linalg.norm(v))
                 away += (v / n if n > 1e-9 else np.array([1.0, 0.0])) * (thr - d)
         c = pl._closest_on_boundary(arena.poly, p)
         d = float(np.linalg.norm(p - c)) * (1.0 if pl.inside(arena.poly, p) else -1.0)
-        thr = evade.ESCAPE_TAPE_M + rel
+        thr = tape_m + rel
         if d < thr:
             v = (p - c) if d >= 0 else (c - p)                # either way this points back into the arena
             n = float(np.linalg.norm(v))
             away += (v / n if n > 1e-9 else np.array([1.0, 0.0])) * (thr - d)
         if float(np.linalg.norm(away)) < 1e-9:
-            self._escaping = False
+            if latch:
+                self._escaping = False
             return None
-        self._escaping = True
-        return {"away": math.degrees(math.atan2(away[1], away[0])), "yaw": yaw}
+        if latch:
+            self._escaping = True
+        return {"away": math.degrees(math.atan2(away[1], away[0])), "yaw": yaw,
+                "depth": min(1.0, float(np.linalg.norm(away)) / max(nogo_m, tape_m))}
 
     def on_state(self, st, now):
         st = self._filter_yaw(st, now)

@@ -557,7 +557,7 @@ def pick_camera(max_index=8):
     print("No more cameras." if found else "No cameras found.")
 
 
-def main(camera=None, flip=None, on_yaw=None, on_state=None, on_draw=None):
+def main(camera=None, flip=None, on_yaw=None, on_state=None, on_draw=None, on_key=None, status=None):
     cap, size = open_camera(camera, flip)
     tr = Tracker(size=size)
     print(f"Camera {size[0]}x{size[1]}, assumed FOV {tr.fov_deg:.0f} deg")
@@ -607,10 +607,16 @@ def main(camera=None, flip=None, on_yaw=None, on_state=None, on_draw=None):
         cv2.putText(frame, txt, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
         cv2.putText(frame, f"FOV {tr.fov_deg:.0f} | slot {active['slot']} (1/2/3) | click balloon = set colour | M mask",
                     (10, size[1] - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1, cv2.LINE_AA)
+        if status:
+            msg = status()                    # e.g. "PAUSED (press P to resume)"
+            if msg:
+                cv2.putText(frame, msg, (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (80, 80, 255), 2, cv2.LINE_AA)
         cv2.imshow("tracker", frame)
         key = cv2.waitKey(1) & 0xFF
         if key == 27:
             break
+        if on_key and key != 255:
+            on_key(key)                       # e.g. follow.py: P = pause / resume the rover
         if key == ord("m"):
             show_mask = not show_mask
             if not show_mask:

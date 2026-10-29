@@ -3,7 +3,7 @@ tests/test_units.py - assert-based checks of the pure logic and the single-purpo
 
     python tests/test_units.py          (or run everything with: python run_tests.py)
 """
-import itertools
+import types, itertools
 import math
 import os
 import socket
@@ -330,6 +330,44 @@ def face_sim(circle_deg_s, secs=8.0, theta0=60.0, noise=4.0, lat=0.2):
     return np.mean(errs[-40:])
 check("facing tracker: turns to face a still opponent from 60 deg off (final error under 8 deg)", face_sim(0.0) < 8, "%.1f deg" % face_sim(0.0))
 check("facing tracker: keeps within 20 deg of an opponent circling at 30 deg/s with 4 deg of noise and 0.2 s delay", face_sim(30.0) < 20, "%.1f deg" % face_sim(30.0))
+
+# ---- pause button + stop when every opponent is popped ----
+class StopMotors:
+    def __init__(self): self.stops = 0; self.writes = []
+    def stop(self): self.stops += 1
+    def write(self, l, r, *a): self.writes.append((l, r))
+_clk = [0.0]
+_sm = StopMotors()
+_calls = []
+_ew = ev.ExternalWatch()
+_br = ev.Brain(ev.ChaserDetector(4), types.SimpleNamespace(motors=_sm, ready=lambda now: True), lambda y: _calls.append(y),
+               external=_ew, clock=lambda: _clk[0])
+_fol = {"x": 0.3, "y": 0.3, "yaw": 0.0}
+def _feed(t, opps):
+    _clk[0] = t; _ew.update(_fol, opps, t, wall=t)
+for i in range(10): _feed(i / 30, {"A": (0.9, 0.3)})
+_br.step(0.0); n0 = len(_calls)
+_br.paused = True
+modes = [_br.step(0.0) for _ in range(5)]
+check("pause: the brain stands still and never calls chase() while paused", modes == ["paused"] * 5 and len(_calls) == n0 and _sm.stops >= 1, f"{modes[:2]}, {_sm.stops} stops")
+_br.paused = False; _br.step(0.0)
+check("pause: resuming calls chase() again", len(_calls) == n0 + 1)
+# the only opponent vanishes right beside us = popped
+t = 1.0
+for i in range(3): _feed(t + i / 30, {"A": (0.4, 0.3)})
+t += 0.2
+_feed(t, {})
+check("all popped: not declared at once (must stay gone a while)", not _ew.all_popped(t))
+_feed(t + 2.0, {})
+check("all popped: declared after it stays gone", _ew.all_popped(t + 2.0))
+_clk[0] = t + 2.0
+check("all popped: the brain parks (mode 'done') and stops the wheels", _br.step(0.0) == "done" and _sm.stops >= 2)
+_feed(t + 2.1, {"A": (0.9, 0.3)})
+check("all popped: an opponent that reappears cancels it", not _ew.all_popped(t + 4.0))
+_ew2 = ev.ExternalWatch()
+for i in range(10): _ew2.update(_fol, {"A": (1.2, 0.3)}, i / 30, wall=i / 30)    # a far-off opponent that vanishes may only be hidden
+_ew2.update(_fol, {}, 1.0, wall=1.0)
+check("all popped: an opponent lost far away does not count as popped", not _ew2.all_popped(10.0))
 
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]

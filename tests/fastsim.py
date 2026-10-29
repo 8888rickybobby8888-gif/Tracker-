@@ -99,6 +99,10 @@ class FastSim(S.Sim):
         self._log(t)
         if w.follower.popped:
             raise S.SimEnd("follower popped")
+        if all(o.popped for o in w.opps):                             # the game is won: give the rover 3 s to notice and stop
+            self.all_popped_t = getattr(self, "all_popped_t", t)
+            if t - self.all_popped_t >= 3.0:
+                raise S.SimEnd("all opponents popped")
         if self.scn.get("until") and self.scn["until"](self):
             raise S.SimEnd("goal reached")
 

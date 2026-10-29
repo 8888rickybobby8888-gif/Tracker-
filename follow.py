@@ -131,6 +131,13 @@ def main(argv=None):
             lambda vals, t: pipe.on_lidar(vals, t, tap.forward_mm_s, tap.rotating, time.time()))
         print(f"Listening for lidar on UDP port {args.lidar_port}")
 
+    def _on_key(key):
+        if key in (ord("p"), ord(" ")):                     # PAUSE / RESUME: the rover stands still while paused
+            print("PAUSED: rover stopped" if pipe.toggle_pause() else "RESUMED")
+
+    def _status():
+        return "PAUSED (P or space = resume)" if brain.paused else ("ALL OPPONENTS POPPED: stopped" if brain._last_mode == "done" else "")
+
     threads = [threading.Thread(target=brain.run, args=(stop, lambda: yaw_to_leader), daemon=True)]
     if receiver or ext:
         def watchdog():
@@ -162,6 +169,7 @@ def main(argv=None):
             import tracker
             tracker.main(args.camera, True if args.flip else None,
                          on_yaw=None if planner else _publish, on_state=on_state,
+                         on_key=_on_key, status=_status,
                          on_draw=(lambda frame, tr: plan.draw_plan(frame, tr, planner)) if planner else None)
     finally:
         stop.set()

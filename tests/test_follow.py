@@ -41,7 +41,7 @@ def run_follow(argv, states_fn=None, esp32_fn=None, secs=2.5, arena=True):
     follow.stop.clear(); follow.yaw_to_leader = follow.yaw_to_target = None
     evade.set_max_speed(30)
 
-    def vision_main(camera, flip, on_yaw=None, on_state=None, on_draw=None):
+    def vision_main(camera, flip, on_yaw=None, on_state=None, on_draw=None, on_key=None, status=None):
         t0 = time.time()
         while time.time() - t0 < secs:
             t = time.time() - t0

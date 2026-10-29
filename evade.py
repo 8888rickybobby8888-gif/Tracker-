@@ -88,10 +88,15 @@ RING_AWAY_COS = 0.5       # ... or it is clearly moving AWAY from you (cos of th
 ESCAPE_NOGO_M = 0.09      # BOUNDARY ESCAPE: if the centre of the rover gets this close to the no-go zone (shoved by an opponent,
                           # or just drifting), stop whatever else it is doing and drive away from it. Top priority.
 ESCAPE_TAPE_M = 0.08      # ... the same for the tape boundary (distance from the centre to the inside edge of the tape)
+POSE_LAG_S = 0.2          # age of the camera's pose of the follower (image + processing): the boundary check looks this far ahead
 ESCAPE_RELEASE_M = 0.03   # it keeps escaping until it is this much further clear (no flip-flopping at the edge)
 ESCAPE_DRIVE = True       # when no opponent is close, drive away from the no-go zone / tape edge (no longer fights the defence)
+SOFT_NOGO_M = 0.30        # HOLD GROUND: while FACING an opponent, from this far out (centre to the no-go zone) ...
+SOFT_TAPE_M = 0.25        # ... or the tape, push back toward the opponent so it can't shove us over the edge
+HOLD_SPEED = 0            # cm/s of push at full depth (an opponent shoves at about 10 cm/s)
 ESCAPE_NUDGE = False      # True = while facing an opponent near an edge, also move forward/back away from it.
                           # Tested: it drops survival against a hunter from 12/12 to 5/12, so it stays off.
+ESCAPE_REVERSE_ONLY = False  # with ESCAPE_NUDGE: only back away from an edge (never drive TOWARD the opponent we are facing)
 ESCAPE_SPEED = 20         # cm/s used for the escape drive (and for the forward/back nudge while facing an opponent)
 TRACK_FACING = True       # while defending, keep FACING the opponent with continuous wheel commands (not discrete turns)
 TRACK_KP = 1.8            # turn rate (deg/s) per degree of bearing error
@@ -110,6 +115,10 @@ EXT_STALE_S = 0.5         # external data older than this (wall clock) is ignore
 
 MAX_SPEED_CM_S = 30.0     # GLOBAL SPEED CAP for the wheels, applied to EVERY motor command (your chase moves too).
                           # The rover itself tops out at 30. Change it live with set_max_speed(). Lower = safer.
+LIDAR_BACK_M = 0.05       # the lidar sits this far behind the rover's centre
+ALL_POPPED_CONFIRM_S = 1.5  # every opponent must stay gone this long before we believe the game is won and stop
+GHOST_LOST_M = 0.30       # an opponent that disappears from the camera within this of you was probably just popped
+LIDAR_MATCH_M = 0.30      # a lidar object within this of a tracked opponent's balloon IS that opponent
 LIDAR_VETO_EXTRA_M = 0.15  # a still lidar object only counts if the camera sees an opponent within
                           # PIN_FROM_BALLOON_M + BALLOON_BACK_M + this of you
 EVADE_SPEED = 25          # cm/s used for the evasive turn; never above MAX_SPEED_CM_S
@@ -317,23 +326,37 @@ class ExternalWatch:
         self.last_update_wall = None
         self._ring_until = -1e9
         self._active_until = {}                     # name -> time until which it counts as an ACTIVE opponent
+        self._status = {}                           # name -> "live" | "popped" (vanished right beside us) | "lost" (vanished far off)
+        self._gone_t = -1e9                         # when the last opponent vanished
+        self._ghosts = []                           # (x, y) of opponents that vanished right beside us: almost surely popped
 
     def update(self, follower, opponents, t, wall=None):
         """follower: {"x","y","yaw"(deg)} or None.  opponents: {name: (x, y)}.  t: seconds."""
         self.last_update_wall = time.time() if wall is None else wall
         for name in list(self._opp):
             if name not in opponents:
-                del self._opp[name]                       # lost: start its history afresh when it returns
+                h = self._opp.pop(name)                   # lost: start its history afresh when it returns
+                f = self._follower
+                self._gone_t = t
+                if h and f is not None and math.hypot(h[-1][1] - f["x"], h[-1][2] - f["y"]) <= GHOST_LOST_M:
+                    self._ghosts.append((h[-1][1], h[-1][2]))     # gone while we were on top of it: it was popped,
+                    self._status[name] = "popped"                 # but its body is still there for the lidar to see
+                else:
+                    self._status[name] = "lost"
         if follower is None:
             self._follower = None
             self._fol.clear()
             self._confirm = 0
             return self._decay(t)
         self._follower = follower
+        if self._ghosts:                                  # an opponent that is back in view near a ghost was not popped
+            self._ghosts = [g for g in self._ghosts
+                            if all(math.hypot(g[0] - o[0], g[1] - o[1]) > LIDAR_MATCH_M for o in opponents.values())]
         self._fol.append((t, follower["x"], follower["y"]))
         while self._fol and t - self._fol[0][0] > EXT_HISTORY_S:
             self._fol.popleft()
         for name, (x, y) in opponents.items():
+            self._status[name] = "live"
             h = self._opp.setdefault(name, deque())
             h.append((t, x, y))
             while h and t - h[0][0] > EXT_HISTORY_S:
@@ -410,6 +433,28 @@ class ExternalWatch:
             return False
         return any(math.hypot(h[-1][1] - f["x"], h[-1][2] - f["y"]) <= radius_m and t < self._active_until.get(n, -1e9)
                    for n, h in self._opp.items() if h)
+
+    def all_popped(self, t):
+        """True once EVERY opponent we have seen has vanished right beside us (popped) and none has been back in view for
+        ALL_POPPED_CONFIRM_S. Any one that vanished far off (maybe just hidden) or reappears makes it False again."""
+        return (bool(self._status) and not self._opp and all(s == "popped" for s in self._status.values())
+                and t - self._gone_t >= ALL_POPPED_CONFIRM_S)
+
+    def lidar_object_is_inactive(self, offset_deg, dist_mm, t):
+        """True if the thing the REAR LIDAR sees (bearing offset_deg from the rear axis, + = rover's left, dist_mm away) is
+        a tracked opponent that is NOT active (not seen moving lately): a parked or already popped opponent can't come at
+        us, and a noisy lidar slope against one is a false alarm. False when no opponent is tracked near that spot
+        (the camera may simply have lost it), so the lidar keeps its say."""
+        f = self._follower
+        if f is None:
+            return False
+        ang = math.radians(f["yaw"] + 180.0 - offset_deg)
+        r = dist_mm / 1000.0 + LIDAR_BACK_M
+        ox, oy = f["x"] + r * math.cos(ang), f["y"] + r * math.sin(ang)
+        near = [n for n, h in self._opp.items() if h and math.hypot(h[-1][1] - ox, h[-1][2] - oy) <= LIDAR_MATCH_M]
+        if near:
+            return all(t >= self._active_until.get(n, -1e9) for n in near)
+        return any(math.hypot(gx - ox, gy - oy) <= LIDAR_MATCH_M for gx, gy in self._ghosts)
 
     def any_within(self, radius_m):
         """True if any currently tracked opponent is within radius_m of the follower."""
@@ -645,6 +690,8 @@ class Brain:
         self.facing = FacingTracker(motors, clock) if (TRACK_FACING and motors is not None and hasattr(motors, "write")) else None
         self._last_mode = None
         self.defended_who = ""                               # last opponent we had to defend against (the planner retargets it)
+        self.paused = False                                  # the PAUSE button: wheels stopped, nothing else runs
+        self._park_t = -1e9
 
     def _drive_away(self, esc):
         """Boundary escape: move away from the no-go zone / tape by the shortest way, forwards or backwards."""
@@ -661,6 +708,21 @@ class Brain:
         else:
             steer = max(-6.0, min(6.0, 0.3 * e))
             m.write(sign * speed - steer, sign * speed + steer)
+
+    def _park(self, mode):
+        """Stand still (paused, or every opponent popped). The stop is re-sent about once a second, so a lost Bluetooth
+        packet can't leave the wheels turning."""
+        now = self.clock()
+        if self._last_mode != mode or now - self._park_t >= 1.0:
+            if self.facing is not None and self.facing.active:
+                self.facing.stop()
+            try:
+                self.evader.motors.stop()
+            except Exception:
+                pass
+            self._park_t = now
+        self._last_mode = mode
+        return mode
 
     def _halt(self):
         """Leaving 'chase' without a new move: stop, because chase() may have left the wheels running."""
@@ -686,13 +748,17 @@ class Brain:
 
     def step(self, yaw):
         now = self.clock()
+        if self.paused:
+            return self._park("paused")
         esc = self.guard.escape(now) if self.guard is not None else None
         lid = self.detector.state(now)
-        if (lid.active and lid.static_only and self.external is not None and self.external.alive(now)
-                and not self.external.any_within(PIN_FROM_BALLOON_M + BALLOON_BACK_M + LIDAR_VETO_EXTRA_M)):
-            lid = Threat()          # something sits close behind us but the camera sees no live opponent there:
-                                    # most likely an opponent that is already popped, or a stray object
+        if (lid.active and self.external is not None and self.external.alive(now) and lid.min_mm > POP_REACH_MM
+                and self.external.lidar_object_is_inactive(lid.offset_deg, lid.min_mm, now)):
+            lid = Threat()          # the camera says that object is an opponent that is parked or already popped: it can't
+                                    # pop us unless WE swing our balloon into its pin, and turning away is exactly that move
         threat = self.fuse(lid, self.external.state(now) if self.external else Threat())
+        if not threat.active and self.external is not None and self.external.all_popped(now):
+            return self._park("done")                      # every opponent is popped: the game is won, stand still
         facing_now = (threat.active and self.facing is not None and threat.source in ("external", "both")
                       and bool(threat.who))
         hunter_near = (esc is not None and self.external is not None
@@ -712,6 +778,12 @@ class Brain:
                 # an edge is near: keep facing the opponent but also back away from the edge along our own axis
                 nudge = (ESCAPE_SPEED * math.cos(math.radians(wrap(esc["away"] - esc["yaw"])))
                          if (esc is not None and ESCAPE_NUDGE) else 0.0)
+                if ESCAPE_REVERSE_ONLY:
+                    nudge = min(nudge, 0.0)
+                if HOLD_SPEED and self.guard is not None and hasattr(self.guard, "edge_push"):
+                    soft = self.guard.edge_push(now)               # near an edge with an opponent in our face: hold our ground
+                    if soft is not None:
+                        nudge += HOLD_SPEED * soft["depth"] * math.cos(math.radians(wrap(soft["away"] - soft["yaw"])))
                 self.facing.step(theta, now, nudge)
                 self._last_mode = "track"
                 return "track"
