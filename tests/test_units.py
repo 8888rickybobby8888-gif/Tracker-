@@ -60,6 +60,16 @@ for s, g in [((0.3, 0.35), (0.9, 0.8)), ((0.2, 0.9), (1.0, 0.25)), ((0.35, 0.55)
     worst = max(worst, abs(length(path) - best_corner_route(Pn, s, g)))
     check(f"planner: route {s}->{g} stays out of the grown zone", ok_valid)
 check("planner: routes are as short as the best brute-force route", worst < 1e-6, f"worst gap {worst:.2e} m")
+Pt = pl.Planner(ARENA)
+f0 = {"x": 0.3, "y": 0.2, "yaw": 0.0}
+t1 = Pt.update({"follower": f0, "A": {"x": 0.9, "y": 0.2}, "B": {"x": 0.3, "y": 0.9}}, 0.0).target
+t2 = Pt.update({"follower": f0, "A": {"x": 0.9, "y": 0.2}, "B": {"x": 0.3, "y": 0.25}}, 0.1).target
+check("planner: fixates on its first target even when another opponent comes closer", t1 == "A" and t2 == "A", f"{t1} then {t2}")
+Pt.set_target("B")
+t3 = Pt.update({"follower": f0, "A": {"x": 0.9, "y": 0.2}, "B": {"x": 0.3, "y": 0.25}}, 0.2).target
+check("planner: set_target() (the opponent we evaded) becomes the target", t3 == "B", t3)
+t4 = Pt.update({"follower": f0, "A": {"x": 0.9, "y": 0.2}}, 0.3).target
+check("planner: falls back to another opponent when the target disappears", t4 == "A", t4)
 Ph = pl.Planner(ARENA)
 firsts = []
 for i in range(60):

@@ -644,6 +644,7 @@ class Brain:
         motors = getattr(evader, "motors", None)
         self.facing = FacingTracker(motors, clock) if (TRACK_FACING and motors is not None and hasattr(motors, "write")) else None
         self._last_mode = None
+        self.defended_who = ""                               # last opponent we had to defend against (the planner retargets it)
 
     def _drive_away(self, esc):
         """Boundary escape: move away from the no-go zone / tape by the shortest way, forwards or backwards."""
@@ -703,6 +704,8 @@ class Brain:
             self._last_mode = "escape"
             return "escape"
         if threat.active:
+            if threat.who:
+                self.defended_who = threat.who
             turn = threat.turn_deg if threat.turn_deg is not None else wrap(180.0 - threat.offset_deg)
             if facing_now:
                 theta = turn if abs(turn) < BEHIND_DEG else self.evader.plan(threat)   # dead behind: IR picks the side

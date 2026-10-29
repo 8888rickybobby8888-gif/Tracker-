@@ -36,7 +36,6 @@ LEAD_S = 0.4               # aim this far ahead of a moving opponent (camera + n
 MIN_SPEED = 0.08           # m/s: slower than this, an opponent's heading is unknown
 BEHIND_M = evade.PIN_REACH_M   # goal distance behind the opponent's balloon point (where your pin meets its balloon)
 ENGAGE_M = 0.25            # within this of the goal point, stop weaving and aim straight at the opponent
-TARGET_SWITCH_M = 0.10     # only switch target if another opponent is this much closer
 WAYPOINT_REACHED_M = 0.05  # a waypoint closer than this counts as reached (the yaw to a point a few cm away is noise)
 HISTORY_S = 0.5            # window for measuring an opponent's velocity
 # -----------------------------------------------------------------------------
@@ -254,11 +253,15 @@ class Planner:
         d = {k: math.hypot(v[0] - fx, v[1] - fy) for k, v in opps.items()}
         if self.target_pref != "nearest":
             return self.target_pref if self.target_pref in opps else None
-        best = min(d, key=d.get)
-        if self._target in d and d[self._target] <= d[best] + TARGET_SWITCH_M:
-            best = self._target
-        self._target = best
-        return best
+        if self._target in d:                              # fixate: keep the current target while it is still in play
+            return self._target
+        self._target = min(d, key=d.get)
+        return self._target
+
+    def set_target(self, name):
+        """Retarget (used when we had to evade that opponent). Ignored for a fixed --target or an unknown name."""
+        if self.target_pref == "nearest" and name:
+            self._target = name
 
     # ---- main entry -----------------------------------------------------------------------
     def update(self, state, now):

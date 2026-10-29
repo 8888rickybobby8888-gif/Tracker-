@@ -154,6 +154,7 @@ class Pipeline:
         if self.ext is not None:
             self.ext.update(st.get("follower"), opps, now, wall=now)
         if self.planner is not None:
+            self.planner.set_target(self.brain.defended_who)   # whoever made us evade becomes the new target
             p = self.planner.update(st, now)
             self.last_plan = p
             self._set(p.yaw_to_waypoint if p else None, p.yaw_to_target if p else None)
