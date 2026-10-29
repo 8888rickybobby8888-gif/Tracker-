@@ -232,7 +232,7 @@ SCENARIOS = {
                        follower=(0.45, 0.30, 0.0),
                        opponents=[("A", 1.25, -0.30, 90.0, "static", 0.0, None),
                                   ("B", 0.45, -0.40, 0.0, "static", 0.0, None),
-                                  ("C", 1.30, 0.45, 180.0, "static", 0.0, None)],
+                                  ("C", 1.20, 0.45, 180.0, "static", 0.0, None)],
                        until=None),
 }
 

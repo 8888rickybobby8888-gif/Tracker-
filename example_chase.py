@@ -14,7 +14,8 @@ from micromelon import *
 
 def chase(yaw):
     if yaw is None:
-        Motors.write(-12, 12)                       # nothing seen: spin left slowly, looking around
+        Motors.write(8, 16)                         # nothing seen: creep round in a small circle, looking around (a spin on the
+                                                    # spot would stay hidden behind whatever is blocking the camera's view)
         return
     if abs(yaw) > 18:                               # well off target: turn almost on the spot first
         w = max(-20, min(20, 0.5 * yaw))            # + yaw = target on the left = turn left = left wheel back, right forward
