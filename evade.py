@@ -752,7 +752,7 @@ class Brain:
             return self._park("paused")
         esc = self.guard.escape(now) if self.guard is not None else None
         lid = self.detector.state(now)
-        if (lid.active and self.external is not None and self.external.alive(now) and lid.min_mm > POP_REACH_MM
+        if (lid.active and self.external is not None and self.external.alive(now)
                 and self.external.lidar_object_is_inactive(lid.offset_deg, lid.min_mm, now)):
             lid = Threat()          # the camera says that object is an opponent that is parked or already popped: it can't
                                     # pop us unless WE swing our balloon into its pin, and turning away is exactly that move
