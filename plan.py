@@ -29,8 +29,8 @@ import evade
 # ----------------------------- CONFIG ---------------------------------------
 ARENA_FILE = "arena.json"
 ROBOT_RADIUS_M = 0.08      # half the rover's longest dimension, from its centre (MEASURE; err on the big side)
-TAPE_MARGIN_M = 0.03       # extra clearance from the tape boundary
-NOGO_MARGIN_M = 0.07       # extra clearance from the no-go zone. Bigger = safer but longer routes (was 0.03)
+TAPE_MARGIN_M = 0.12       # extra clearance from the tape boundary
+NOGO_MARGIN_M = 0.13       # extra clearance from the no-go zone. Bigger = safer but longer routes (was 0.03)
 HYSTERESIS_M = 0.08        # keep the side you committed to unless the other side is this much shorter
 LEAD_S = 0.4               # aim this far ahead of a moving opponent (camera + network delay)
 MIN_SPEED = 0.08           # m/s: slower than this, an opponent's heading is unknown

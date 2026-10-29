@@ -28,6 +28,8 @@ def check(name, ok, detail=""):
 
 # ------------------------------------------------------------------------------------------------ planner
 ARENA = pl.Arena([(0, 0), (1.2, 0), (1.2, 1.1), (0, 1.1)], [(0.525, 0.475), (0.675, 0.475), (0.675, 0.625), (0.525, 0.625)])
+_SAVED_MARGINS = (pl.TAPE_MARGIN_M, pl.NOGO_MARGIN_M)
+pl.TAPE_MARGIN_M, pl.NOGO_MARGIN_M = 0.03, 0.07      # the route geometry checks use the small test arena: use the tight margins
 P = pl.Planner(ARENA)
 r = pl.ROBOT_RADIUS_M + pl.NOGO_MARGIN_M
 sq = ARENA.nogo
@@ -60,6 +62,7 @@ for s, g in [((0.3, 0.35), (0.9, 0.8)), ((0.2, 0.9), (1.0, 0.25)), ((0.35, 0.55)
     worst = max(worst, abs(length(path) - best_corner_route(Pn, s, g)))
     check(f"planner: route {s}->{g} stays out of the grown zone", ok_valid)
 check("planner: routes are as short as the best brute-force route", worst < 1e-6, f"worst gap {worst:.2e} m")
+pl.TAPE_MARGIN_M, pl.NOGO_MARGIN_M = _SAVED_MARGINS
 Pt = pl.Planner(ARENA)
 f0 = {"x": 0.3, "y": 0.2, "yaw": 0.0}
 t1 = Pt.update({"follower": f0, "A": {"x": 0.9, "y": 0.2}, "B": {"x": 0.3, "y": 0.9}}, 0.0).target

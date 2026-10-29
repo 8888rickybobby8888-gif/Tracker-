@@ -228,7 +228,7 @@ SCENARIOS = {
                    until=popped("A")),
     # three non-aggressive (static) opponents with the camera drifting: nothing should trigger an evasion, and
     # all three balloons should be tracked
-    "three_calm": dict(name="three_calm", duration=40.0,
+    "three_calm": dict(name="three_calm", duration=60.0,
                        follower=(0.45, 0.30, 0.0),
                        opponents=[("A", 1.25, -0.30, 90.0, "static", 0.0, None),
                                   ("B", 0.45, -0.40, 0.0, "static", 0.0, None),
