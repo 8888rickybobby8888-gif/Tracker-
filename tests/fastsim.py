@@ -64,6 +64,26 @@ class FastSim(S.Sim):
         self._prev_err[key] = e
         return e
 
+    # Measured on the full renderer (17 hunter/three_calm runs): with an opponent within 0.45 m the follower's marker is hidden
+    # about 27% of the time, in bursts that last 1.9 s on average, separated by about 4.5 s of being tracked.
+    OCCLUDE_NEAR_M, OCCLUDE_ON_S, OCCLUDE_OFF_S = 0.45, 4.5, 1.9
+
+    def _occluded(self, sn):
+        """Two-state (tracked / hidden) process, only while a live opponent is close to the follower."""
+        if not getattr(self, "occlusion", True):
+            return False
+        n = self.nrng
+        fx, fy = sn.agents["follower"][0], sn.agents["follower"][1]
+        near = any((not a[3]) and math.hypot(a[0] - fx, a[1] - fy) < self.OCCLUDE_NEAR_M
+                   for k, a in sn.agents.items() if k != "follower")
+        if not near:
+            self._hidden = False
+        elif getattr(self, "_hidden", False):
+            self._hidden = n.random() >= (1.0 / self.OCCLUDE_OFF_S) / 15.0
+        else:
+            self._hidden = n.random() < (1.0 / self.OCCLUDE_ON_S) / 15.0
+        return self._hidden
+
     def _state_from(self, sn):
         n = self.nrng
         st = {}
@@ -78,7 +98,7 @@ class FastSim(S.Sim):
             bx, by = ax - sw.BALLOON_BACK * math.cos(ayaw), ay - sw.BALLOON_BACK * math.sin(ayaw)
             e = self._err(name, "opponent")
             st[name] = {"x": bx + e[0], "y": by + e[1], "age": 0.0}
-        if n.random() < self.dropout:
+        if n.random() < self.dropout or self._occluded(sn):
             st.pop("follower")
         return st
 

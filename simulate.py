@@ -152,7 +152,7 @@ class Sim:
         f = w.follower
         est = self.last_state
         row = dict(t=t, x=f.x, y=f.y, yaw=math.degrees(f.yaw), mode=self.mode, vl=f.vl * f.gl, vr=f.vr * f.gr,
-                   clear=sw.dist_point_rect(f.x, f.y, sw.NOGO_RECT),
+                   clear=sw.dist_point_poly(f.x, f.y, sw.NOGO),
                    lidar=self.detector.state(t).active, ext=self.ext.state(t).active,
                    yaw_cmd=self.pipe.yaw_to_leader,
                    opp={o.name: (o.x, o.y, o.balloon[0], o.balloon[1], o.popped) for o in w.opps})

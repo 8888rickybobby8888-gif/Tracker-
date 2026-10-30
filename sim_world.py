@@ -23,7 +23,18 @@ import tracker as tk
 
 SIZE = (1280, 720)
 ARENA = [(0.20, -0.565), (1.40, -0.565), (1.40, 0.565), (0.20, 0.565)]       # floor frame, metres (inner tape edge)
-NOGO = [(0.725, -0.075), (0.875, -0.075), (0.875, 0.075), (0.725, 0.075)]
+NOGO_SIDE, NOGO_ROT_DEG = 0.15, 45.0        # the no-go square is turned 45 degrees (a diamond), centred at (0.80, 0)
+
+
+def rotated_square(cx, cy, side, deg):
+    """Corners of a square (counter-clockwise) turned by deg degrees about its centre."""
+    a = math.radians(deg)
+    h = side / 2.0
+    pts = [(-h, -h), (h, -h), (h, h), (-h, h)]
+    return [(cx + x * math.cos(a) - y * math.sin(a), cy + x * math.sin(a) + y * math.cos(a)) for x, y in pts]
+
+
+NOGO = rotated_square(0.80, 0.0, NOGO_SIDE, NOGO_ROT_DEG)
 TRACK_EFF_CM = 18.7              # effective track for spins: matches the Micromelon module's turn calibration
 BODY_L, BODY_W, BODY_H = 0.12, 0.10, 0.08
 PIN_TIP = 0.10                   # rover centre -> pin tip
@@ -52,6 +63,43 @@ ARENA_RECT = rect_of(ARENA)
 
 def dist_point_rect(px, py, r):
     return math.hypot(max(r[0] - px, 0, px - r[2]), max(r[1] - py, 0, py - r[3]))
+
+
+def dist_point_poly(px, py, poly):
+    """Distance from a point to a convex polygon (0 if inside)."""
+    n = len(poly)
+    inside = all((poly[(i + 1) % n][0] - poly[i][0]) * (py - poly[i][1]) - (poly[(i + 1) % n][1] - poly[i][1]) * (px - poly[i][0]) >= 0
+                 for i in range(n)) or all((poly[(i + 1) % n][0] - poly[i][0]) * (py - poly[i][1]) - (poly[(i + 1) % n][1] - poly[i][1]) * (px - poly[i][0]) <= 0
+                                           for i in range(n))
+    if inside:
+        return 0.0
+    best = 1e9
+    for i in range(n):
+        ax, ay = poly[i]
+        bx, by = poly[(i + 1) % n]
+        dx, dy = bx - ax, by - ay
+        t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)))
+        best = min(best, math.hypot(px - (ax + t * dx), py - (ay + t * dy)))
+    return best
+
+
+def ray_poly(ox, oy, dx, dy, poly):
+    """Distance along a ray to a convex polygon, or None (0 if it starts inside)."""
+    if dist_point_poly(ox, oy, poly) == 0.0:
+        return 0.0
+    best = None
+    n = len(poly)
+    for i in range(n):
+        ax, ay = poly[i]
+        ex, ey = poly[(i + 1) % n][0] - ax, poly[(i + 1) % n][1] - ay
+        den = dx * ey - dy * ex
+        if abs(den) < 1e-12:
+            continue
+        t = ((ax - ox) * ey - (ay - oy) * ex) / den
+        u = ((ax - ox) * dy - (ay - oy) * dx) / den
+        if t >= 0.0 and 0.0 <= u <= 1.0 and (best is None or t < best):
+            best = t
+    return best
 
 
 def ray_circle(ox, oy, dx, dy, cx, cy, r):
@@ -146,7 +194,7 @@ class Opponent(Agent):
                 for _ in range(100):                                   # a new random point inside the tape, clear of the no-go square
                     p = (self.rng.uniform(ARENA_RECT[0] + 0.15, ARENA_RECT[2] - 0.15),
                          self.rng.uniform(ARENA_RECT[1] + 0.15, ARENA_RECT[3] - 0.15))
-                    if dist_point_rect(p[0], p[1], NOGO_RECT) > 0.2:
+                    if dist_point_poly(p[0], p[1], NOGO) > 0.2:
                         break
                 self._wp, self._wp_t = p, world.t
             st = {"follower": {"x": self.x, "y": self.y, "yaw": math.degrees(self.yaw)}, "T": {"x": self._wp[0], "y": self._wp[1]}}
@@ -224,7 +272,7 @@ class World:
                         v.popped = True
                         self.events.append((self.t, f"{a.name} popped {v.name}"))
         f = self.follower
-        c = dist_point_rect(f.x, f.y, NOGO_RECT)
+        c = dist_point_poly(f.x, f.y, NOGO)
         self.min_nogo_clear = min(self.min_nogo_clear, c)
         if c < BODY_CIRCLE:
             self.nogo_viol += 1
@@ -390,7 +438,7 @@ def ir_cm(snap):
                 t = ray_circle(x, y, dx, dy, ax, ay, BODY_CIRCLE)
                 if t is not None:
                     best = min(best, t)
-        t = ray_rect(x, y, dx, dy, NOGO_RECT)
+        t = ray_poly(x, y, dx, dy, NOGO)
         if t is not None:
             best = min(best, t)
         res.append(int(best * 100))
