@@ -163,6 +163,16 @@ your measured `BALLOON_BACK_M`, `PIN_FROM_BALLOON_M` / `POP_REACH_MM` automatica
 Other numbers: `CLOSING_MIN_MM_S`, `DANGER_MM`, `EXT_AIM_DEG`, `FRONT_SAFE_DEG`, `EVADE_SPEED`, `EVADE_COOLDOWN_S`.
 Set `TTC_TRIGGER_S` / `EXT_TTC_S` to a number of seconds only if you want to override the automatic timing.
 
+### What the defence does once an opponent is on you
+The quick turn above is for something coming from behind. An opponent that is close and MOVING (or moved in the last 3 s) is
+instead FACED continuously (`FacingTracker`): smooth wheel commands keep your front toward it, so your balloon stays on the far side.
+- Inside `HARD_RING_M` an opponent always counts, however you move. `RING_MIN_SPEED` (0.05 m/s) must stay above the camera's speed noise.
+- The camera loses your marker about a quarter of the time with an opponent beside you: your position and heading are then carried on
+  from the wheel commands (up to 1.5 s, 5 s with an opponent beside you; `pipeline.py`), the heading is checked against the wheels
+  when the marker comes back, and with no pose at all the rover stands still rather than search.
+- Off by default and left in the code, because they lost more than they won in simulation (`docs/EXPERIMENTS.md`): `BACKOFF_SPEED`,
+  `SIDESTEP_SPEED`, `HOLD_SPEED`, and `plan.AVOID_R_M`.
+
 ## Max speed
 `MAX_SPEED_CM_S` in `evade.py` is a global cap on the wheel speed. It is enforced on EVERY motor command, including the
 ones in your `my_chase.py` (they are clamped on the way to the rover), and it can't go above the rover's own limit of 30.
@@ -177,6 +187,7 @@ Needs the external camera (`--camera`). Set it up once:
 
     python scan_arena.py --camera 1       SCAN it automatically: finds the tape boundary and the no-go zone, press ENTER to save
     python mark_arena.py --camera 1       or click the 4 inner tape corners, then the 4 corners of the no-go square, Enter
+                                          (the no-go square may be turned, e.g. 45 degrees: scan and click both handle any rotation)
 
 **Scanning (`scan_arena.py`).** Keep the floor marker in view and clear the arena of robots (robots the tracker can see are
 ignored, but a clear floor is safest). It re-draws the floor from straight above using the floor marker, so the camera can sit
@@ -194,11 +205,17 @@ point behind the target (where your pin meets its balloon). Close to that point 
 `yaw_to_target` (a variable in follow.py) always points straight at the target, for reference.
 - `--target A` chases a particular colour slot (default `nearest`); `--no-plan` switches planning off.
 - The live view draws the arena, the no-go zone (and its grown outline), the path, the next waypoint and the goal.
-- Tuning numbers are at the top of `plan.py`: `ROBOT_RADIUS_M` (MEASURE: half the rover's longest side), `NOGO_MARGIN_M` (bigger = keeps further from the no-go zone), `TAPE_MARGIN_M`,
-  `BEHIND_M`, `ENGAGE_M`, `LEAD_S`.
-- Use move-and-wait in your chase code: do a short move, then wait about as long as the camera delay (0.3-0.6 s)
-  before reading `yaw` again. The camera's picture is a little old, so re-reading straight away makes the rover
-  correct for a turn it has already made and it wobbles.
+- Tuning numbers are at the top of `plan.py`: `ROBOT_RADIUS_M` (MEASURE: half the rover's longest side), `NOGO_MARGIN_M` and
+  `TAPE_MARGIN_M` (how far the route keeps from the no-go zone and the tape; now 0.13 and 0.12 on top of the radius, which cut tape and
+  no-go violations a lot in simulation), `BEHIND_M`, `ENGAGE_M`, `LEAD_S`. The no-go zone is grown with ROUND corners (what a round
+  robot sweeps out), so a turned square still leaves room to pass.
+- **Which opponent is the target** (`plan.TARGET_MODE`, default `"adaptive"`): the nearest, then it STAYS on it (no flipping between two
+  opponents at similar distances); it switches to an opponent the rover had to defend against; it gives up on a target it has not got
+  closer to for 14 s (for 20 s, if another is in play); and while two or more opponents are moving it takes a still one first. Other
+  modes: `"sticky"`, `"switch"`, `"active_first"`, `"calm_first"`. The comparison is in `docs/EXPERIMENTS.md`.
+- Your `chase(yaw)` should set the wheel speeds and return (like `example_chase.py`), not do "a short move, then wait": while it waits
+  the rover cannot see a threat, and the camera's picture is a little old so a wait-and-look chase wobbles. Wheel speeds beyond the cap
+  are clamped, not an error.
 - If the opponent is hardly moving its heading is unknown, so it aims at the opponent itself (the front, possibly).
 
 ## Follower with its own camera (ESP32-CAM): onboard.py

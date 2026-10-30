@@ -46,12 +46,16 @@ for title, script in (("2. unit tests", "tests/test_units.py"), ("3. screen and 
 if "--sim" in sys.argv:
     print("\n== 4. full-system simulation (slow)")
     import simulate as S
-    # name: (what must hold, known weakness?)
+    # name: (what must hold, known weakness?)  -- seed 0, full renderer. "Known weakness" = a stochastic fight that is lost in some seeds
+    # (see docs/EXPERIMENTS.md): it is reported but does not fail the run.
+    clean = lambda s: s["nogo_frames"] == 0 and s["tape_frames"] == 0 and not s["follower_popped"]
     expect = {
-        "chase_around": (lambda s: s["end"] == "goal reached" and s["nogo_frames"] == 0 and s["tape_frames"] == 0, False),
-        "start_beside_nogo": (lambda s: s["end"] == "goal reached" and s["nogo_frames"] == 0 and s["tape_frames"] == 0, False),
-        "three_calm": (lambda s: s["evades"] == 0 and not s["follower_popped"] and s["nogo_frames"] == 0, False),
-        "hunter": (lambda s: s["end"] == "goal reached" and not s["follower_popped"], True),
+        "chase_around": (lambda s: s["end"] == "goal reached" and clean(s), False),
+        "start_beside_nogo": (lambda s: s["end"] == "goal reached" and clean(s), False),
+        "wanderer": (lambda s: s["end"] == "goal reached" and clean(s), False),
+        # all three popped and the rover stopped; a few tape frames while it reaches a balloon that hangs near the tape are tolerated
+        "three_calm": (lambda s: s["end"] == "all opponents popped" and not s["follower_popped"] and s["nogo_frames"] == 0 and s["tape_frames"] <= 60, False),
+        "hunter": (lambda s: s["end"] == "goal reached" and clean(s), True),
     }
     for name, (ok_fn, known) in expect.items():
         sim, s, rec = S.run_scenario(name, video=False)

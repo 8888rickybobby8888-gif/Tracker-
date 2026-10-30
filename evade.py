@@ -5,10 +5,18 @@ Pure Python (numpy only). No hardware imports, so it can be tested with fake dat
 
 Pieces
   ChaserDetector    rear lidar frames in -> "something is closing in from behind" out
-  ExternalWatch     external-camera floor positions in -> "an opponent is coming at us, from ANY direction" out
-  EvadeController   turns the rover to face the chaser (uses the side IR to pick a side when it is dead behind)
-  MotionTap         learns how fast the rover is moving/turning by watching motor commands
-  Brain             each step: evade if EITHER source reports a threat, otherwise call YOUR chase(yaw)
+  ExternalWatch     external-camera floor positions in -> "an opponent is coming at us, from ANY direction" out. Also keeps
+                    each opponent's status (live / popped at our pin tip / lost), the "ghosts" of popped robots (their bodies stay
+                    on the floor and the lidar sees them), and whether every opponent has been popped
+  FacingTracker     while an opponent is in our face, keep FACING it with smooth wheel commands (our balloon stays on the far side)
+  EvadeController   the quick turn to face a chaser (uses the side IR to pick a side when it is dead behind)
+  MotionTap         learns how fast the rover is moving/turning from the motor packets, and enforces the global speed cap
+  install_speed_clamp   clamps Motors.write to the cap (micromelon raises outside -30..30)
+  Brain             each step, in priority order: paused -> no camera frames (stop) -> floor-sensor tape guard (opt-in) -> boundary
+                    escape -> defend (face the threat; optional back-off / sidestep / hold-ground, all OFF) -> every opponent popped (stand
+                    still) -> chase(yaw), or stand still if our marker is hidden with an opponent beside us. run() stops the wheels on
+                    errors and after MAX_BRAIN_ERRORS in a row stays stopped.
+  (pipeline.py wires these to the tracker and the planner; plan.py chooses the target and the route.)
 
 Conventions
   distances in millimetres; angles in degrees
