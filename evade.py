@@ -93,6 +93,7 @@ ESCAPE_RELEASE_M = 0.03   # it keeps escaping until it is this much further clea
 ESCAPE_DRIVE = True       # when no opponent is close, drive away from the no-go zone / tape edge (no longer fights the defence)
 SOFT_NOGO_M = 0.30        # HOLD GROUND: while FACING an opponent, from this far out (centre to the no-go zone) ...
 SOFT_TAPE_M = 0.25        # ... or the tape, push back toward the opponent so it can't shove us over the edge
+LOST_KEEP_S = 4.0         # an opponent that vanished from the camera this recently is still treated as "beside us" for that rule
 HOLD_WHEN_LOST_M = 0.5    # no pose for chase() (marker hidden) and an opponent within this: stand still instead of searching
 BACKOFF_SPEED = 0         # cm/s, OFF: backing away from a slower opponent in our face (set e.g. 28 to try). On the full renderer it lost more often (3 pops in 8 seeds vs 1)
 BACKOFF_M = 0.35          # start backing off when its balloon is this close (to our centre) ...
@@ -332,6 +333,7 @@ class ExternalWatch:
         self._ring_until = -1e9
         self._active_until = {}                     # name -> time until which it counts as an ACTIVE opponent
         self._last_fol = None                       # last position we ever had for the follower (kept when its marker is hidden)
+        self._lost_recent = {}                      # name -> (x, y, t) of opponents that just vanished from the camera
         self._status = {}                           # name -> "live" | "popped" (vanished right beside us) | "lost" (vanished far off)
         self._gone_t = -1e9                         # when the last opponent vanished
         self._ghosts = []                           # (x, y) of opponents that vanished right beside us: almost surely popped
@@ -342,6 +344,8 @@ class ExternalWatch:
         for name in list(self._opp):
             if name not in opponents:
                 h = self._opp.pop(name)                   # lost: start its history afresh when it returns
+                if h:
+                    self._lost_recent[name] = (h[-1][1], h[-1][2], t)
                 f = self._follower
                 self._gone_t = t
                 if h and f is not None and math.hypot(h[-1][1] - f["x"], h[-1][2] - f["y"]) <= GHOST_LOST_M:
@@ -364,6 +368,7 @@ class ExternalWatch:
             self._fol.popleft()
         for name, (x, y) in opponents.items():
             self._status[name] = "live"
+            self._lost_recent.pop(name, None)
             h = self._opp.setdefault(name, deque())
             h.append((t, x, y))
             while h and t - h[0][0] > EXT_HISTORY_S:
@@ -469,11 +474,14 @@ class ExternalWatch:
             return all(t >= self._active_until.get(n, -1e9) for n in near)
         return any(math.hypot(gx - ox, gy - oy) <= LIDAR_MATCH_M for gx, gy in self._ghosts)
 
-    def any_near_last_seen(self, radius_m):
+    def any_near_last_seen(self, radius_m, t):
         """True if a tracked opponent is within radius_m of where the follower was LAST seen (works while its marker is hidden)."""
         if self._last_fol is None:
             return False
-        return any(math.hypot(h[-1][1] - self._last_fol[0], h[-1][2] - self._last_fol[1]) <= radius_m for h in self._opp.values() if h)
+        fx, fy = self._last_fol
+        if any(math.hypot(h[-1][1] - fx, h[-1][2] - fy) <= radius_m for h in self._opp.values() if h):
+            return True
+        return any(math.hypot(x - fx, y - fy) <= radius_m and t - tl <= LOST_KEEP_S for x, y, tl in self._lost_recent.values())
 
     def distance(self, name):
         """Floor distance from the follower's centre to the opponent's tracked balloon, or None."""
@@ -835,7 +843,7 @@ class Brain:
         elif self.facing is not None and self.facing.active:
             self.facing.stop()
         if (yaw is None and HOLD_WHEN_LOST_M and self.external is not None and self.external.alive(now)
-                and self.external.any_near_last_seen(HOLD_WHEN_LOST_M)):
+                and self.external.any_near_last_seen(HOLD_WHEN_LOST_M, now)):
             return self._park("hold")                      # we've lost sight of our own marker with an opponent in our
                                                            # face: don't go searching blindly (that turns our balloon to it)
         global EVADE_LATENCY_EXTRA_S
