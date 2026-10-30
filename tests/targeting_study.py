@@ -2,7 +2,7 @@
 tests/targeting_study.py - which way of choosing the target works best? Fast simulator, several scenarios with 2-3 opponents,
 every run lasts until all opponents are popped, the follower is popped, or 60 s.
 
-    python tests/targeting_study.py [--seeds 20]
+    python tests/targeting_study.py [--seeds 20] [--only "sticky + retarget threat,calm_first + retarget"]
 
 Methods compared (plan.TARGET_MODE, pipeline.RETARGET_ON_THREAT):
   nearest, re-checked every frame ("switch")        the original rule
@@ -54,6 +54,10 @@ def run(job):
 
 def main():
     n = int(sys.argv[sys.argv.index("--seeds") + 1]) if "--seeds" in sys.argv else 20
+    only = sys.argv[sys.argv.index("--only") + 1].split(",") if "--only" in sys.argv else list(CONFIGS)
+    for c in list(CONFIGS):
+        if c not in only:
+            del CONFIGS[c]
     jobs = [(c, sc, sd) for c in CONFIGS for sc in scenarios() for sd in range(n)]
     t0 = time.time()
     with Pool(4) as p:
