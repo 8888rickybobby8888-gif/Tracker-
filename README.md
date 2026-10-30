@@ -19,7 +19,8 @@ Each match:
   (the rover stands still while paused), `[` `]` tune the field of view, `F` re-lock the floor, `Esc` quit.
 - It stops by itself once every opponent has been popped. Ctrl+C in the terminal also stops the rover.
 - Useful options: `--max-speed 20` (cap the wheels), `--target A` (always chase slot A), `--no-lidar`, `--no-plan`,
-  `--rover 2` (Bluetooth ID), `--flip` (mirrored image). Details are further down.
+  `--rover 2` (Bluetooth ID), `--flip` (mirrored image), `--floor-sensors` (use the rover's three floor colour sensors as a tape
+  detector: start with the rover on bare floor inside the arena. NOT tested on the real rover). Details are further down.
 
 ### What happens when something goes wrong (fail-safes)
 - **Ctrl+C**, or the live window closing, stops the rover.

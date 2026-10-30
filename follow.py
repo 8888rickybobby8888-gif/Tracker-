@@ -64,6 +64,11 @@ def read_ir():
     return left, right
 
 
+def read_floor_colours():
+    """[[hue, r, g, b, bright] x 3] for the left, middle and right floor colour sensors."""
+    return Colour.readAllSensors(CS.ALL)
+
+
 def load_mask():
     if os.path.exists(MASK_FILE):
         import numpy as np
@@ -88,6 +93,9 @@ def main(argv=None):
     ap.add_argument("--no-lidar", action="store_true", help="run without the rear lidar (no evasion!)")
     ap.add_argument("--max-speed", type=float, default=None,
                     help="global wheel speed cap in cm/s (default: MAX_SPEED_CM_S in evade.py, rover max 30)")
+    ap.add_argument("--floor-sensors", action="store_true",
+                    help="use the floor colour sensors as a tape detector (tape guard + position fix). NOT TESTED ON THE REAL ROVER: "
+                         "start with the rover on bare floor inside the arena, it learns what the floor reads")
     ap.add_argument("--no-plan", action="store_true", help="don't plan routes: yaw points straight at the nearest opponent")
     ap.add_argument("--target", default="nearest", help='which opponent to chase: "nearest" (default) or a slot name A/B/C')
     args = ap.parse_args(argv)
@@ -117,7 +125,19 @@ def main(argv=None):
                   "Until then yaw points straight at the nearest opponent.")
 
     detector = evade.ChaserDetector(evade.GRID, mask=load_mask())
+    read_floor = None
+    if args.floor_sensors:
+        import floor
+        fs = floor.FloorSensors(read_floor_colours)
+        try:
+            base, spread = fs.calibrate(10, time.sleep)
+            print(f"Floor sensors: bare floor reads brightness {base['bright']:.0f} (spread {spread:.0f}). "
+                  "Anything much darker, or clearly red, counts as tape.")
+            read_floor = fs.tape
+        except Exception as e:
+            print("Floor sensors NOT used (could not read them):", repr(e))
     pipe = pipeline.Pipeline(detector, ext, planner, my_chase.chase, MicromelonMotors(), read_ir,
+                             read_floor=read_floor,
                              publish=_publish, motion=lambda: (tap.left, tap.right))
     on_state = lambda st: pipe.on_state(st, time.time())     # called by tracker.py every frame
     brain = pipe.brain

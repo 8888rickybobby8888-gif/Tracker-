@@ -19,7 +19,7 @@ def check(name, ok, detail=""):
 
 ARENA = {"arena": [[0, 0], [1.2, 0], [1.2, 1.1], [0, 1.1]], "nogo": [[0.525, 0.475], [0.675, 0.475], [0.675, 0.625], [0.525, 0.625]]}
 
-def run_follow(argv, states_fn=None, esp32_fn=None, secs=2.5, arena=True):
+def run_follow(argv, states_fn=None, esp32_fn=None, secs=2.5, arena=True, drive=False):
     """One run of follow.main with everything fake. Returns what happened."""
     events, chase_yaws, drawn = [], [], []
     if arena: json.dump(ARENA, open("arena.json", "w"))
@@ -37,7 +37,7 @@ def run_follow(argv, states_fn=None, esp32_fn=None, secs=2.5, arena=True):
     follow.MicromelonMotors.turn_degrees = lambda self, d, sp: (events.append(("evade-turn", round(d, 1), sp)), time.sleep(0.2))
     follow.read_ir = lambda: (25.0, 25.0)
     follow.Motors = types.SimpleNamespace(write=lambda *a: events.append(("write",) + a))
-    follow.my_chase.chase = lambda yaw: chase_yaws.append(yaw)
+    follow.my_chase.chase = (lambda yaw: (chase_yaws.append(yaw), follow.Motors.write(20, 20))) if drive else (lambda yaw: chase_yaws.append(yaw))
     follow.stop.clear(); follow.yaw_to_leader = follow.yaw_to_target = None
     evade.set_max_speed(30)
 
@@ -108,6 +108,22 @@ check("external camera only: an attack from the left side makes the rover turn L
 run_follow(["--camera", "0", "--no-lidar", "--max-speed", "18"], secs=0.5)
 check("--max-speed 18 sets the global cap", evade.MAX_SPEED_CM_S == 18.0)
 evade.set_max_speed(30)
+
+# 7. --floor-sensors: calibrates on the bare floor, then polls the sensors
+floor_calls = []
+floor_mode = ["floor"]
+def fake_floor():
+    floor_calls.append(1)
+    return [[0, 200, 200, 200, 200]] * 3 if floor_mode[0] == "floor" else [[0, 40, 40, 40, 50]] * 3
+follow.read_floor_colours = fake_floor
+def drive_then_tape(t):
+    if t > 1.2: floor_mode[0] = "tape"
+    return {"follower": {"x": 0.3, "y": 0.3, "yaw": 0.0, "age": 0}, "A": {"x": 0.9, "y": 0.3, "age": 0}}
+ev7, ch, _ = run_follow(["--camera", "0", "--no-lidar", "--no-plan", "--floor-sensors"], states_fn=drive_then_tape, secs=3.0, drive=True)
+check("--floor-sensors: a run with tape under the sensors completes and shuts down cleanly (the guard itself is covered in test_units)",
+      [e[0] for e in ev7 if e[0] in ("stop", "end")] == ["stop", "end"])
+check("--floor-sensors: the sensors are read (calibration + polling)", len(floor_calls) >= 12, f"{len(floor_calls)} reads")
+floor_mode[0] = "floor"
 
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r in results if r[1]), len(results)))
 for r in results:
