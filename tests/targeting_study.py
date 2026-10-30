@@ -24,6 +24,7 @@ CONFIGS = {
     "active_first + retarget":        ("active_first", True),
     "calm_first":                     ("calm_first", False),
     "calm_first + retarget":          ("calm_first", True),
+    "adaptive + retarget":            ("adaptive", True),
 }
 
 def scenarios():

@@ -36,7 +36,7 @@ LEAD_S = 0.4               # aim this far ahead of a moving opponent (camera + n
 MIN_SPEED = 0.08           # m/s: slower than this, an opponent's heading is unknown
 BEHIND_M = evade.PIN_REACH_M   # goal distance behind the opponent's balloon point (where your pin meets its balloon)
 TARGET_MODE = "sticky"      # how a target is chosen: "sticky" (nearest, then fixate), "switch" (always the nearest, re-checked every
-                            # frame), "active_first" (the nearest MOVING opponent first), "calm_first" (the nearest STILL one first)
+                            # frame), "active_first" (the nearest MOVING opponent first), "calm_first" (the nearest STILL one first), "adaptive" (sticky, but a still one first while 2+ are moving)
 STALL_S = 14.0              # give up on a target we haven't got closer to (by STALL_PROGRESS_M) for this long ...
 STALL_PROGRESS_M = 0.05
 SKIP_S = 20.0               # ... and don't pick it again for this long (if another opponent is in play)
@@ -315,6 +315,8 @@ class Planner:
         if TARGET_MODE == "active_first" and active:       # hunt the hunter: the nearest opponent that is moving
             pool = active
         elif TARGET_MODE == "calm_first" and calm:         # leave the hunter alone: the nearest one that is not moving
+            pool = calm
+        elif TARGET_MODE == "adaptive" and calm and len(active) >= 2:   # two or more are moving: take a still one first
             pool = calm
         self._target = min(pool, key=pool.get)
         self._best_d, self._best_t = d[self._target], now
