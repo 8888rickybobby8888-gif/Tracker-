@@ -26,3 +26,24 @@ All numbers are from the simulator (never the real rover). "Fast sim" = `tests/f
   arena, then it is popped. Seeds 2 and 6 behave the same way in some runs.
 - Survival against a hunter is about 80% in the fast sim and 70-88% over 16 full-render seeds, depending on the code version.
 - Nothing has run on the real camera, rover, ESP32 or lidar.
+
+## Which target to go for (tests/targeting_study.py; fast sim, 5 scenarios with 2-3 opponents, 60 seeds each = 300 runs per method)
+| Method | Survived | Cleared all opponents | Avg clear time | Runs with no violation |
+|---|---|---|---|---|
+| Fixate on the nearest, retarget the attacker (old default "sticky") | 220 | 173 | 31.6 s | 214 |
+| Take a STILL opponent first, always ("calm_first") | 199 | 166 | 30.8 s | 226 |
+| **Adaptive (now the default): as sticky, but take a still one first while 2+ are moving** | **220** | **180** | 31.2 s | 220 |
+
+By scenario (survived / cleared of 60):
+| Scenario | sticky | calm_first | adaptive |
+|---|---|---|---|
+| 1 hunter + 2 still | 49 / 24 | 25 / 11 | 42 / 19 |
+| hunter + wanderer + still | 35 / 21 | 31 / 21 | 30 / 23 |
+| 2 hunters + 1 still | 28 / 21 | 38 / 31 | 40 / 31 |
+| 3 still, 3 patrolling | tied | tied | tied |
+
+- Going for the hunter FIRST is the worst method (20-run study: slowest, 67 of 100 runs violation-free vs 76-79).
+- Retargeting the opponent we had to defend against helps when we avoid the hunter first, and is neutral otherwise.
+- Adaptive matches the best method for two hunters and loses a little (42 vs 49 survived of 60) against a single hunter. That gap is about
+  1.2 standard errors, so it may be noise. "Active" means seen moving at 0.05 m/s or more in the last 3 s, so it depends on the camera's
+  speed noise staying below that (unmeasured on the real camera).
