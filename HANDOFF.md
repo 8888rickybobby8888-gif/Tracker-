@@ -48,7 +48,7 @@ floor colour sensors (opt-in) -> floor.py
 | File | What it is |
 |---|---|
 | `tracker.py` | external-camera tracker, live view (keys: click = colour, 1/2/3 slot, M mask, [ ] FOV, F re-lock, P/space pause, Esc) |
-| `plan.py` | planner: route round the no-go zone (round-cornered keep-out), goal point behind the target, **target selection** (`TARGET_MODE`, default `adaptive`) |
+| `plan.py` | planner: route round the no-go zone (round-cornered keep-out), goal point behind the target, **target selection** (`TARGET_MODE`, default `sticky`) |
 | `evade.py` | defence (`ExternalWatch`, `FacingTracker`, `EvadeController`, `MotionTap`, `Brain`, fail-safes). Constants at the top |
 | `pipeline.py` | glue: heading filter, dead reckoning (+ contact anchoring), escape, floor-sensor fix, retarget-on-threat |
 | `floor.py` | floor colour sensors as a tape detector (opt-in, uncalibrated for the real rover) |
@@ -78,8 +78,9 @@ full-render scenarios); `python simulate.py hunter` (video in `sim_output/`).
 - A popped robot's body stays on the floor: the lidar still sees it. The camera-based "popped" test is "its balloon vanished at our pin
   tip"; a robot that vanishes beside us was just hidden.
 - The planner keep-out must be grown with ROUND corners: a mitred corner on a 45 degree diamond closed the corridors beside it.
-- **Target fixation had a bug** (it fell through to "nearest" whenever we were making progress, which also overwrote the retarget).
-  Fixed; the targeting study results written before the fix (in `docs/EXPERIMENTS.md`) need re-reading in that light.
+- **Target fixation had a bug** (it fell through to "nearest" whenever we were making progress, which also overwrote the retarget). Fixed. The
+  targeting study was re-run after the fix and NO method beat another (docs/EXPERIMENTS.md); results quoted elsewhere that were produced before
+  the fix (the 16-seed full-render `hunter` numbers in section 6) may shift and need re-measuring.
 
 ## 6. Results (simulation)
 Full renderer, `hunter` scenario, 16 seeds (older code, before the fixation fix): about 11-14 wins, 2-3 pops, 0-2 time-outs; zero violations in

@@ -35,7 +35,7 @@ HYSTERESIS_M = 0.08        # keep the side you committed to unless the other sid
 LEAD_S = 0.4               # aim this far ahead of a moving opponent (camera + network delay)
 MIN_SPEED = 0.08           # m/s: slower than this, an opponent's heading is unknown
 BEHIND_M = evade.PIN_REACH_M   # goal distance behind the opponent's balloon point (where your pin meets its balloon)
-TARGET_MODE = "adaptive"     # how a target is chosen: "sticky" (nearest, then fixate), "switch" (always the nearest, re-checked every
+TARGET_MODE = "sticky"       # how a target is chosen: "sticky" (nearest, then fixate), "switch" (always the nearest, re-checked every
                             # frame), "active_first" (the nearest MOVING opponent first), "calm_first" (the nearest STILL one first), "adaptive" (sticky, but a still one first while 2+ are moving)
 AVOID_R_M = 0.0             # >0 = route AROUND moving opponents that are not the target: a keep-out circle of this radius (m) on where each will be
                             # in AVOID_LEAD_S. 0 = off. A hunter is slower than we are, so keeping clear of it means it never gets to push us.

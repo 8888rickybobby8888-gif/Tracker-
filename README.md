@@ -209,10 +209,10 @@ point behind the target (where your pin meets its balloon). Close to that point 
   `TAPE_MARGIN_M` (how far the route keeps from the no-go zone and the tape; now 0.13 and 0.12 on top of the radius, which cut tape and
   no-go violations a lot in simulation), `BEHIND_M`, `ENGAGE_M`, `LEAD_S`. The no-go zone is grown with ROUND corners (what a round
   robot sweeps out), so a turned square still leaves room to pass.
-- **Which opponent is the target** (`plan.TARGET_MODE`, default `"adaptive"`): the nearest, then it STAYS on it (no flipping between two
-  opponents at similar distances); it switches to an opponent the rover had to defend against; it gives up on a target it has not got
-  closer to for 14 s (for 20 s, if another is in play); and while two or more opponents are moving it takes a still one first. Other
-  modes: `"sticky"`, `"switch"`, `"active_first"`, `"calm_first"`. The comparison is in `docs/EXPERIMENTS.md`.
+- **Which opponent is the target** (`plan.TARGET_MODE`, default `"sticky"`): the nearest, then it STAYS on it (no flipping between two
+  opponents at similar distances); it switches to an opponent the rover had to defend against (`pipeline.RETARGET_ON_THREAT`); and it
+  gives up on a target it has not got closer to for 14 s (for 20 s, if another is in play). Other modes: `"switch"` (always the nearest),
+  `"adaptive"`, `"active_first"`, `"calm_first"`. In simulation none of them beat the others (`docs/EXPERIMENTS.md`).
 - Your `chase(yaw)` should set the wheel speeds and return (like `example_chase.py`), not do "a short move, then wait": while it waits
   the rover cannot see a threat, and the camera's picture is a little old so a wait-and-look chase wobbles. Wheel speeds beyond the cap
   are clamped, not an error.
