@@ -94,6 +94,12 @@ check("pause key: the status line is asked for on every frame and shows PAUSED o
       len(pk["msgs"]) >= 18 and pk["msgs"][2] == "" and pk["msgs"][7].startswith("PAUSED") and pk["msgs"][13] == "" and pk["msgs"][16].startswith("PAUSED"),
       f"{len(pk['msgs'])} frames: " + ",".join("P" if m else "-" for m in pk["msgs"][:20]))
 
+def _bad_key(k): raise RuntimeError("key handler broke")
+def _bad_status(): raise RuntimeError("status broke")
+gui.update(i=0, shown=0, script={5: ord("p"), 12: 27})
+tk.main(0, None, on_key=_bad_key, status=_bad_status)
+check("tracker.main: a key handler or status callback that raises does not stop the live view", gui["shown"] >= 10, f"{gui['shown']} frames shown")
+
 # ---------------- 2. mark_arena.main: click the arena + no-go corners while the camera drifts ----------------
 cam.t = 0.0
 saved = {}

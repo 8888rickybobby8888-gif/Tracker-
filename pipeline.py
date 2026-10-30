@@ -297,6 +297,22 @@ class Pipeline:
             self.last_plan = p
             self._set(p.yaw_to_waypoint if p else None, p.yaw_to_target if p else None)
 
+    def safe_on_state(self, st, now):
+        """on_state for the live run: an error in the vision/planning code must not crash the whole run in the middle of a match.
+        The rover stops, the yaw goes to None (nothing to chase) and the next frame tries again."""
+        try:
+            self.on_state(st, now)
+            self._state_errors = 0
+        except Exception as e:
+            self._state_errors = getattr(self, "_state_errors", 0) + 1
+            if self._state_errors in (1, 10, 100):
+                print(f"vision/planning error ({self._state_errors} in a row), rover stopped, retrying next frame: {e!r}")
+            self._set(None, None)
+            try:
+                self.evader.motors.stop()
+            except Exception:
+                pass
+
     def on_lidar(self, vals, t, forward_mm_s, rotating, wall=None):
         self.detector.update(vals, t, forward_mm_s, rotating, wall=wall)
 

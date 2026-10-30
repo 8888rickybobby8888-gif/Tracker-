@@ -140,7 +140,7 @@ def main(argv=None):
     pipe = pipeline.Pipeline(detector, ext, planner, my_chase.chase, MicromelonMotors(), read_ir,
                              read_floor=read_floor,
                              publish=_publish, motion=lambda: (tap.left, tap.right))
-    on_state = lambda st: pipe.on_state(st, time.time())     # called by tracker.py every frame
+    on_state = lambda st: pipe.safe_on_state(st, time.time())     # called by tracker.py every frame
     brain = pipe.brain
     receiver = None
     if args.no_lidar:

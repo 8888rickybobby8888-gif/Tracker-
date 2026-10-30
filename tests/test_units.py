@@ -532,6 +532,16 @@ _pw2.on_state(_S, 0.0); _pw2.brain.defended_who = "B"; _pw2.on_state(_S, 0.1)
 check("retarget wiring: ... unless RETARGET_ON_THREAT is switched off", _pw2.last_plan.target == "A", _pw2.last_plan.target)
 _pp.RETARGET_ON_THREAT = True
 
+# ---- a vision/planning error must not crash a live run ----
+_se = StopMotors()
+_pe = _pp.Pipeline(ev.ChaserDetector(4), ev.ExternalWatch(), pl.Planner(ARENA), lambda y: None, _se, None, motion=lambda: (0.0, 0.0))
+_pe.on_state({"follower": {"x": 0.2, "y": 0.2, "yaw": 0.0, "age": 0.0}, "A": {"x": 0.9, "y": 0.2}}, 0.0)
+_good_yaw = _pe.yaw_to_leader
+_pe.planner.update = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("planner broke"))
+_pe.safe_on_state({"follower": {"x": 0.2, "y": 0.2, "yaw": 0.0, "age": 0.0}, "A": {"x": 0.9, "y": 0.2}}, 0.1)
+check("safe_on_state: an error in the planner does not propagate; the rover stops and yaw goes to None",
+      _good_yaw is not None and _pe.yaw_to_leader is None and _se.stops >= 1, f"yaw {_good_yaw} -> {_pe.yaw_to_leader}, {_se.stops} stops")
+
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]
 for r_ in failed:

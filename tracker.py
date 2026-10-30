@@ -608,7 +608,10 @@ def main(camera=None, flip=None, on_yaw=None, on_state=None, on_draw=None, on_ke
         cv2.putText(frame, f"FOV {tr.fov_deg:.0f} | slot {active['slot']} (1/2/3) | click balloon = set colour | M mask",
                     (10, size[1] - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1, cv2.LINE_AA)
         if status:
-            msg = status()                    # e.g. "PAUSED (press P to resume)"
+            try:
+                msg = status()                # e.g. "PAUSED (press P to resume)"
+            except Exception as e:            # a display helper must never take the vision loop (and the rover with it) down
+                msg = f"status error: {e!r}"[:60]
             if msg:
                 cv2.putText(frame, msg, (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (80, 80, 255), 2, cv2.LINE_AA)
         cv2.imshow("tracker", frame)
@@ -616,7 +619,10 @@ def main(camera=None, flip=None, on_yaw=None, on_state=None, on_draw=None, on_ke
         if key == 27:
             break
         if on_key and key != 255:
-            on_key(key)                       # e.g. follow.py: P = pause / resume the rover
+            try:
+                on_key(key)                   # e.g. follow.py: P = pause / resume the rover
+            except Exception as e:
+                print("on_key error:", repr(e))
         if key == ord("m"):
             show_mask = not show_mask
             if not show_mask:
