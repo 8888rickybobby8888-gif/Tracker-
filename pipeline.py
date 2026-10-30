@@ -126,6 +126,10 @@ class Pipeline:
         x += (left + right) / 200.0 * math.cos(math.radians(yaw)) * dt
         y += (left + right) / 200.0 * math.sin(math.radians(yaw)) * dt
         self._dr, self._dr_last = (t0, x, y, yaw), now
+        if YAW_FILTER:                                         # keep the heading filter running through the gap, so a glitchy
+            self._yaw, self._yaw_t = evade.wrap(yaw), now      # reading when the marker reappears (a robot half-covering it)
+            self._yaw_hist.append((now, self._yaw))            # is checked against the wheels, not adopted as the truth
+            self._yaw_hist = [h for h in self._yaw_hist if now - h[0] < 1.0]
         st = dict(st)
         st["follower"] = {"x": x, "y": y, "yaw": yaw, "age": 0.0, "dead_reckoned": True}
         return st

@@ -117,6 +117,9 @@ TRACK_MAX_DEG_S = 170     # fastest turn rate it will command (also limited by E
 TRACK_DEADBAND_DEG = 3    # facing it this well and it is not circling: stay still
 EXT_CONFIRM_FRAMES = 3
 EXT_CLEAR_S = 0.5
+NO_CAMERA_STOP_S = 0.8    # FAIL-SAFE: no frame from the external camera for this long -> the rover stops (it resumes by itself when
+                          # frames come back). Chasing on the last picture would drive it blind.
+MAX_BRAIN_ERRORS = 3      # FAIL-SAFE: this many errors in a row in the brain loop (your chase() included) -> stop the wheels
 EXT_STALE_S = 0.5         # external data older than this (wall clock) is ignored
 
 MAX_SPEED_CM_S = 30.0     # GLOBAL SPEED CAP for the wheels, applied to EVERY motor command (your chase moves too).
@@ -525,6 +528,11 @@ class ExternalWatch:
         now = time.time() if now is None else now
         return self.last_update_wall is not None and now - self.last_update_wall <= EXT_STALE_S
 
+    def age(self, now=None):
+        """Seconds since the camera last delivered a frame (inf if it never has)."""
+        now = time.time() if now is None else now
+        return float("inf") if self.last_update_wall is None else now - self.last_update_wall
+
 
 class FacingTracker:
     """While a threatening opponent is close, keep FACING it with continuous (non-blocking) wheel commands, so your
@@ -737,6 +745,8 @@ class Brain:
         self.facing = FacingTracker(motors, clock) if (TRACK_FACING and motors is not None and hasattr(motors, "write")) else None
         self._last_mode = None
         self.defended_who = ""                               # last opponent we had to defend against (the planner retargets it)
+        self._cam_lost = False                               # the no-camera fail-safe has stopped us
+        self.errors = 0                                      # consecutive errors in run()
         self._backing = False                                # backing off from a slower opponent in our face
         self.paused = False                                  # the PAUSE button: wheels stopped, nothing else runs
         self._park_t = -1e9
@@ -798,6 +808,14 @@ class Brain:
         now = self.clock()
         if self.paused:
             return self._park("paused")
+        if self.external is not None and self.external.age(now) > NO_CAMERA_STOP_S:
+            if not self._cam_lost and self.external.last_update_wall is not None:
+                print(f"STOPPED: no frame from the external camera for {NO_CAMERA_STOP_S:.1f} s (resumes when it comes back)")
+            self._cam_lost = self.external.last_update_wall is not None     # (before the very first frame we just wait quietly)
+            return self._park("no-camera")
+        if self._cam_lost:
+            print("external camera is back: resuming")
+            self._cam_lost = False
         esc = self.guard.escape(now) if self.guard is not None else None
         lid = self.detector.state(now)
         if (lid.active and self.external is not None and self.external.alive(now)
@@ -871,7 +889,16 @@ class Brain:
         while not stop_event.is_set():
             try:
                 self.step(get_yaw())
+                self.errors = 0
             except Exception as e:                      # keep the loop alive; show what went wrong
+                self.errors += 1
                 print("brain error:", repr(e))
+                try:                                    # an error must never leave the wheels running on their last command
+                    self.evader.motors.stop()
+                except Exception:
+                    pass
+                self._last_mode = "error"
+                if self.errors == MAX_BRAIN_ERRORS:
+                    print(f"STOPPED: {self.errors} errors in a row. The rover stays stopped until a step works again.")
                 time.sleep(0.5)
             time.sleep(period)

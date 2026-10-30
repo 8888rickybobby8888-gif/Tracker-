@@ -21,6 +21,19 @@ Each match:
 - Useful options: `--max-speed 20` (cap the wheels), `--target A` (always chase slot A), `--no-lidar`, `--no-plan`,
   `--rover 2` (Bluetooth ID), `--flip` (mirrored image). Details are further down.
 
+### What happens when something goes wrong (fail-safes)
+- **Ctrl+C**, or the live window closing, stops the rover.
+- **Pause** (`P` / space) stops it until you press it again.
+- **The external camera stops delivering frames** for 0.8 s: the rover stops and says so. It resumes by itself when frames return.
+- **An error in the brain loop, including in your `chase()`**: the wheels are stopped at once (they never keep their last command),
+  the error is printed, and it retries every half second. After 3 errors in a row it prints that it is stopped and stays stopped
+  until a step works again.
+- **The rear lidar goes quiet**: a warning is printed and only the lidar part of the evasion is off. The rover keeps going on the
+  camera alone.
+- **The follower's marker is hidden** (a robot in the way): its position and heading are carried on from the wheel commands for up to
+  1.5 s (5 s with an opponent beside it). After that, with an opponent beside it, it stands still. With nothing beside it, `chase(None)` runs.
+- **Not covered:** a lost Bluetooth link (whatever the Micromelon module does), and a camera that keeps sending frames of a frozen picture.
+
 ### How to run the simulator (no camera, rover or ESP32 needed)
 
     python run_tests.py                         # compile + unit + screen/script + follow.py + arena-scan tests (1-2 minutes)

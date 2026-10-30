@@ -257,6 +257,14 @@ def draw_map(sim, size=(560, 450)):
     a = sw.ARENA
     for (p, q), col in zip(zip(a, a[1:] + a[:1]), [(55, 55, 215), (6, 6, 6), (55, 55, 215), (6, 6, 6)]):
         cv2.line(img, P(*p), P(*q), col, 5, cv2.LINE_AA)
+    if sim.planner is not None:                                  # where the planner will not send the follower: the tape and the
+        for poly, col in ((sim.planner.free, (110, 110, 110)), (sim.planner.block, (110, 110, 190))):    # no-go zone, each grown by the robot's radius + margin
+            pts = np.array([P(*p) for p in poly], np.int32)
+            for i in range(len(pts)):
+                a, b = pts[i], pts[(i + 1) % len(pts)]
+                for u in np.arange(0.0, 1.0, 0.25):
+                    p0 = (a + (b - a) * u).astype(int); p1 = (a + (b - a) * min(u + 0.12, 1.0)).astype(int)
+                    cv2.line(img, tuple(p0), tuple(p1), col, 1, cv2.LINE_AA)                           # dashed outline
     ng = np.array([P(*p) for p in sw.NOGO], np.int32)
     cv2.fillPoly(img, [ng], (60, 60, 140))
     for i in range(-8, 12):
@@ -337,6 +345,7 @@ def draw_map(sim, size=(560, 450)):
     cv2.putText(img, f"t={t:5.1f}s  {sim.mode.upper()}", (10, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6, col, 2, cv2.LINE_AA)
     cv2.putText(img, "threat: " + (" + ".join(src) if src else "none"), (10, 44), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1, cv2.LINE_AA)
     cv2.putText(img, f"speed cap {ev.MAX_SPEED_CM_S:.0f} cm/s", (10, H - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (160, 160, 160), 1, cv2.LINE_AA)
+    cv2.putText(img, "dashed = keep-out (route limits)", (10, H - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (150, 150, 200), 1, cv2.LINE_AA)
     cv2.putText(img, "TRUTH (cross/circles = what the tracker sees)", (170, H - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (160, 160, 160), 1, cv2.LINE_AA)
     for i, (te, txt) in enumerate(w.events[-3:]):
         cv2.putText(img, f"{te:5.1f}s  {txt.upper()}", (W - 230, 22 + 20 * i), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (90, 90, 255), 2, cv2.LINE_AA)

@@ -408,6 +408,28 @@ for _i in range(10): _ew.update({"x": 0.3, "y": 0.3, "yaw": 0.0}, {"B": (0.25, 0
 _ew.update({"x": 0.3, "y": 0.3, "yaw": 0.0}, {}, 1.0, wall=1.0)
 check("popped: one that vanishes beside/behind us (hidden by a robot) does NOT", _ew._status.get("B") == "lost", str(_ew._status))
 
+# ---- fail-safes: camera goes quiet, repeated errors ----
+_ck = [0.0]
+_sm2 = StopMotors()
+_ew3 = ev.ExternalWatch()
+_br3 = ev.Brain(ev.ChaserDetector(4), types.SimpleNamespace(motors=_sm2, ready=lambda now: True), lambda y: None, external=_ew3, clock=lambda: _ck[0])
+for _i in range(10): _ck[0] = _i / 30; _ew3.update({"x": 0.3, "y": 0.3, "yaw": 0.0}, {"A": (0.9, 0.3)}, _ck[0], wall=_ck[0])
+check("fail-safe: with camera frames arriving the brain runs", _br3.step(0.0) == "chase")
+_ck[0] = 0.3 + ev.NO_CAMERA_STOP_S + 0.1                                     # the camera has gone quiet
+_m3 = _br3.step(0.0)
+check("fail-safe: no camera frame for a while -> the rover stops", _m3 == "no-camera" and _sm2.stops >= 1, f"{_m3}, {_sm2.stops} stops")
+_ew3.update({"x": 0.3, "y": 0.3, "yaw": 0.0}, {"A": (0.9, 0.3)}, _ck[0], wall=_ck[0])
+check("fail-safe: it resumes by itself when frames come back", _br3.step(0.0) == "chase")
+_sm4 = StopMotors()
+def _boom(y): raise RuntimeError("your chase() failed")
+_br4 = ev.Brain(ev.ChaserDetector(4), types.SimpleNamespace(motors=_sm4, ready=lambda now: True), _boom, external=None)
+import threading as _th
+_stop = _th.Event()
+_t = _th.Thread(target=_br4.run, args=(_stop, lambda: 0.0, 0.01), daemon=True); _t.start()
+time.sleep(1.4); _stop.set(); _t.join(2)
+check("fail-safe: an error in chase() stops the wheels (it never leaves them on the last command)", _sm4.stops >= 2 and _br4.errors >= ev.MAX_BRAIN_ERRORS,
+      f"{_sm4.stops} stops, {_br4.errors} errors")
+
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]
 for r_ in failed:
