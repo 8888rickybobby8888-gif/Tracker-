@@ -108,13 +108,14 @@ class Agent:
 
 
 class Opponent(Agent):
-    """kind: static | patrol | orbit | hunter"""
+    """kind: static | patrol | orbit | hunter | wander (drives to random points round the arena, ignoring the follower)"""
 
     def __init__(self, name, x, y, yaw_deg, kind="static", speed=0.10, path=None, seed=0):
         super().__init__(name, x, y, yaw_deg)
         self.kind, self.speed, self.path, self.wp = kind, speed, path or [], 0
         self.delay = 0.4                       # a hunter reacts to where the follower WAS 0.4 s ago, like a real controller
-        self.planner = pl.Planner(pl.Arena(ARENA, NOGO), "T") if kind == "hunter" else None
+        self.planner = pl.Planner(pl.Arena(ARENA, NOGO), "T") if kind in ("hunter", "wander") else None
+        self._wp, self._wp_t = None, -1e9
         self.rng = np.random.default_rng(seed)
 
     def _drive(self, err, v):
@@ -139,6 +140,21 @@ class Opponent(Agent):
             err = math.atan2(math.sin(math.atan2(ty - self.y, tx - self.x) - self.yaw),
                              math.cos(math.atan2(ty - self.y, tx - self.x) - self.yaw))
             self._drive(err, self.speed)
+        elif self.kind == "wander":
+            if (self._wp is None or math.hypot(self._wp[0] - self.x, self._wp[1] - self.y) < 0.08
+                    or world.t - self._wp_t > 7.0):
+                for _ in range(100):                                   # a new random point inside the tape, clear of the no-go square
+                    p = (self.rng.uniform(ARENA_RECT[0] + 0.15, ARENA_RECT[2] - 0.15),
+                         self.rng.uniform(ARENA_RECT[1] + 0.15, ARENA_RECT[3] - 0.15))
+                    if dist_point_rect(p[0], p[1], NOGO_RECT) > 0.2:
+                        break
+                self._wp, self._wp_t = p, world.t
+            st = {"follower": {"x": self.x, "y": self.y, "yaw": math.degrees(self.yaw)}, "T": {"x": self._wp[0], "y": self._wp[1]}}
+            p = self.planner.update(st, world.t)
+            if p is None:
+                self.vl = self.vr = 0.0
+                return
+            self._drive(math.radians(p.yaw_to_waypoint), self.speed)
         elif self.kind == "hunter":
             _, fx, fy, fyaw = world.follower_seen_by_hunter(self.delay)
             bx, by = fx - BALLOON_BACK * math.cos(fyaw), fy - BALLOON_BACK * math.sin(fyaw)

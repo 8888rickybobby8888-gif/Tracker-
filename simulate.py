@@ -226,6 +226,13 @@ SCENARIOS = {
                    opponents=[("A", 1.25, -0.30, 90.0, "static", 0.0, None),
                               ("B", 0.30, -0.45, 0.0, "hunter", 0.11, None)],
                    until=popped("A")),
+    # B just wanders: it drives to random points round the arena and never aims at the follower. Shows how the follower's
+    # path changes when an opponent crosses it by chance (compare with the "hunter" scenario, where B aims at it)
+    "wanderer": dict(name="wanderer", duration=60.0,
+                     follower=(0.45, 0.30, 0.0),
+                     opponents=[("A", 1.25, -0.30, 90.0, "static", 0.0, None),
+                                ("B", 0.30, -0.45, 0.0, "wander", 0.11, None)],
+                     until=popped("A")),
     # three non-aggressive (static) opponents with the camera drifting: nothing should trigger an evasion, and
     # all three balloons should be tracked
     "three_calm": dict(name="three_calm", duration=60.0,
@@ -257,6 +264,16 @@ def draw_map(sim, size=(560, 450)):
     cv2.polylines(img, [ng], True, (150, 150, 255), 2, cv2.LINE_AA)
     w, t = sim.world, sim.world.t
     L = sim.log
+    # the whole path so far (thin) ...
+    for name, col in (("follower", (255, 255, 255)), ("A", sw.BGR["A"]), ("B", sw.BGR["B"]), ("C", sw.BGR["C"])):
+        pts = []
+        for r in L[::8]:
+            if name == "follower":
+                pts.append(P(r["x"], r["y"]))
+            elif name in r["opp"]:
+                pts.append(P(r["opp"][name][0], r["opp"][name][1]))
+        if len(pts) > 1 and name in ("follower", "B"):
+            cv2.polylines(img, [np.array(pts, np.int32)], False, tuple(int(c * 0.45) for c in col), 1, cv2.LINE_AA)
     # trails (last 4 s)
     for name, col in (("follower", (255, 255, 255)), ("A", sw.BGR["A"]), ("B", sw.BGR["B"]), ("C", sw.BGR["C"])):
         pts = []
