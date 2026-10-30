@@ -440,6 +440,46 @@ check("dead reckoning: in contact, the estimate is pulled to the contact distanc
 _x2, _y2 = _pp.Pipeline._contact_fix(None, {"B": {"x": 0.20, "y": 0.00}}, 0.90, 0.0, 0.0)
 check("dead reckoning: an opponent far away changes nothing", (_x2, _y2) == (0.90, 0.0))
 
+# ---- floor colour sensors: tape detection, tape guard, position fix ----
+import floor as _fl
+_floor = {"bright": 200.0, "red_excess": 0.0}
+check("floor sensors: bare floor is not tape", not _fl.classify([0, 190, 200, 195, 200], _floor))
+check("floor sensors: much darker than the floor is (black) tape", _fl.classify([0, 40, 40, 40, 50], _floor))
+check("floor sensors: red is (red) tape", _fl.classify([0, 210, 60, 70, 150], _floor))
+check("floor sensors: a faintly reddish floor is not", not _fl.classify([0, 200, 170, 170, 190], _floor))
+_seq = iter([[[0, 200, 200, 200, 200]] * 3] * 3 + [[[0, 40, 40, 40, 50]] + [[0, 200, 200, 200, 200]] * 2] * 2)
+_fs = _fl.FloorSensors(lambda: next(_seq))
+_fs.calibrate(n=3)
+_a = _fs.tape(); _b = _fs.tape()
+check("floor sensors: needs 2 reads in a row, then only the sensor over the tape fires", _a == [False] * 3 and _b == [True, False, False], f"{_a} {_b}")
+
+_ARENA_T = pl.Arena([(0.0, 0.0), (1.2, 0.0), (1.2, 1.1), (0.0, 1.1)], None)
+_mt = [20.0, 20.0]
+_flags = [[False, True, False]]
+_pipe = _pp.Pipeline(ev.ChaserDetector(4), ev.ExternalWatch(), pl.Planner(_ARENA_T), lambda y: None,
+                     types.SimpleNamespace(stop=lambda: None, write=lambda l, r: None), None,
+                     motion=lambda: tuple(_mt), read_floor=lambda: _flags[0])
+_pipe.pose = (0.5, 0.5, 90.0, 0.0)                       # we think we are 0.45 m from the top edge, facing it ...
+_pipe._pose_dr = False
+_pipe.floor_tape(1.0)
+check("floor sensors: a camera pose is NOT moved by a tape sighting", _pipe.pose[:2] == (0.5, 0.5))
+_pipe.pose = (1.1 - 0.05 - 0.04, 0.5, 0.0, 0.0)           # ... or 4 cm short of the right-hand tape (middle sensor 5 cm ahead)
+_pipe._pose_dr = True; _pipe._dr = (0.0, 1.01, 0.5, 0.0)
+_pipe._floor_t = -1e9
+_pipe.floor_tape(2.0)
+check("floor sensors: a dead-reckoned pose is pulled back to the edge when a sensor sees the tape",
+      abs((_pipe.pose[0] + 0.05) - 1.2) < 0.005, f"x={_pipe.pose[0]:.3f}")
+_sm5 = StopMotors(); _w5 = []
+_sm5.write = lambda l, r: _w5.append((l, r))
+_br5 = ev.Brain(ev.ChaserDetector(4), types.SimpleNamespace(motors=_sm5, ready=lambda now: True), lambda y: None, guard=_pipe, clock=lambda: _ck5[0])
+_ck5 = [10.0]
+_pipe._floor_t = -1e9
+_m5 = _br5.step(0.0)
+check("floor sensors: tape under a sensor while driving forward -> back off", _m5 == "tape" and _w5 and _w5[-1][0] < 0, f"{_m5} {_w5[-1:]}")
+_mt[:] = [0.0, 0.0]; _ck5[0] = 12.0; _pipe._floor_t = -1e9
+_m5 = _br5.step(0.0)
+check("floor sensors: standing still on the tape does not trigger the guard", _m5 != "tape", _m5)
+
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]
 for r_ in failed:

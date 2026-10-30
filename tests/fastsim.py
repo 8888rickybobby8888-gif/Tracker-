@@ -84,12 +84,35 @@ class FastSim(S.Sim):
             self._hidden = n.random() < (1.0 / self.OCCLUDE_ON_S) / 15.0
         return self._hidden
 
+    # Measured on the full renderer: with an opponent within 0.3 m the marker's heading is wrong by more than 15 degrees about 21% of
+    # the time (more than 30 degrees 9%), in bursts, because the robot half-covers the marker.
+    YAWBURST_NEAR_M, YAWBURST_ON_S, YAWBURST_OFF_S, YAWBURST_DEG = 0.30, 4.0, 1.2, (15.0, 45.0)
+
+    def _yaw_burst(self, sn):
+        """Extra heading error (degrees) from a robot half-covering the marker: a burst with a fixed offset."""
+        if not getattr(self, "yaw_bursts", True):
+            return 0.0
+        n = self.nrng
+        fx, fy = sn.agents["follower"][0], sn.agents["follower"][1]
+        near = any((not a[3]) and math.hypot(a[0] - fx, a[1] - fy) < self.YAWBURST_NEAR_M for k, a in sn.agents.items() if k != "follower")
+        on = getattr(self, "_yb_on", False)
+        if not near:
+            self._yb_on = False
+            return 0.0
+        if on:
+            if n.random() < (1.0 / self.YAWBURST_OFF_S) / 15.0:
+                self._yb_on = False
+        elif n.random() < (1.0 / self.YAWBURST_ON_S) / 15.0:
+            self._yb_on = True
+            self._yb_off = float(n.choice([-1.0, 1.0]) * n.uniform(*self.YAWBURST_DEG))
+        return self._yb_off if self._yb_on else 0.0
+
     def _state_from(self, sn):
         n = self.nrng
         st = {}
         x, y, yaw, _ = sn.agents["follower"]
         e = self._err("follower", "follower")
-        st["follower"] = {"x": x + e[0], "y": y + e[1], "yaw": math.degrees(yaw) + e[2], "age": 0.0}
+        st["follower"] = {"x": x + e[0], "y": y + e[1], "yaw": math.degrees(yaw) + e[2] + self._yaw_burst(sn), "age": 0.0}
         for name, (ax, ay, ayaw, popped) in sn.agents.items():
             if name == "follower" or popped:
                 continue

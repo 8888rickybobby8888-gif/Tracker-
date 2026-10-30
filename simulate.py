@@ -47,7 +47,7 @@ def apply_measurements():
 
 class Sim:
     def __init__(self, scenario, seed=0, evade_on=True, max_speed=30.0, planning=True, camera_drift=True,
-                 recorder=None, label=None, target="nearest"):
+                 recorder=None, label=None, target="nearest", floor=False):
         apply_measurements()
         ev.set_max_speed(max_speed)
         self.label = label or scenario["name"]
@@ -79,7 +79,8 @@ class Sim:
         self.pipe = pipeline.Pipeline(self.detector, self.ext, self.planner, example_chase.chase,
                                       follow.MicromelonMotors(), lambda: sw.ir_cm(self.world.snapshot_at(self.world.t)),
                                       clock=lambda: self.world.t,
-                                      motion=lambda: (self.motors.tap.left, self.motors.tap.right))
+                                      motion=lambda: (self.motors.tap.left, self.motors.tap.right),
+                                      read_floor=(lambda: sw.floor_flags(self.world.follower)) if floor else None)
         if not evade_on:
             self.pipe.evader.ready = lambda now: False              # evasion switched off for the comparison
         handle, chase = self.pipe.evader.handle, self.pipe.brain.chase

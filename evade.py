@@ -119,6 +119,9 @@ EXT_CONFIRM_FRAMES = 3
 EXT_CLEAR_S = 0.5
 NO_CAMERA_STOP_S = 0.8    # FAIL-SAFE: no frame from the external camera for this long -> the rover stops (it resumes by itself when
                           # frames come back). Chasing on the last picture would drive it blind.
+TAPE_BACKOFF_S = 0.5      # floor sensors: back off this long after one sees tape while we were driving forward
+TAPE_BACKOFF_SPEED = 18   # cm/s
+TAPE_FORWARD_MIN_CM_S = 3.0
 MAX_BRAIN_ERRORS = 3      # FAIL-SAFE: this many errors in a row in the brain loop (your chase() included) -> stop the wheels
 EXT_STALE_S = 0.5         # external data older than this (wall clock) is ignored
 
@@ -745,6 +748,7 @@ class Brain:
         self.facing = FacingTracker(motors, clock) if (TRACK_FACING and motors is not None and hasattr(motors, "write")) else None
         self._last_mode = None
         self.defended_who = ""                               # last opponent we had to defend against (the planner retargets it)
+        self._tape_until = -1e9                              # floor-sensor tape guard: back off until this time
         self._cam_lost = False                               # the no-camera fail-safe has stopped us
         self.errors = 0                                      # consecutive errors in run()
         self._backing = False                                # backing off from a slower opponent in our face
@@ -816,6 +820,20 @@ class Brain:
         if self._cam_lost:
             print("external camera is back: resuming")
             self._cam_lost = False
+        if self.guard is not None and hasattr(self.guard, "floor_tape"):        # FLOOR SENSORS (opt-in): tape under the front = stop and back off
+            tape = self.guard.floor_tape(now)
+            if any(tape) and self.guard.forward_speed() > TAPE_FORWARD_MIN_CM_S:
+                self._tape_until = max(self._tape_until, now + TAPE_BACKOFF_S)
+            if now < self._tape_until:
+                try:
+                    v = min(TAPE_BACKOFF_SPEED, evade_speed())
+                    self.evader.motors.write(-v, -v)
+                except Exception:
+                    pass
+                if self.facing is not None and self.facing.active:
+                    self.facing.stop()
+                self._last_mode = "tape"
+                return "tape"
         esc = self.guard.escape(now) if self.guard is not None else None
         lid = self.detector.state(now)
         if (lid.active and self.external is not None and self.external.alive(now)

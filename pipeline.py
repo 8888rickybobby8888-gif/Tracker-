@@ -13,6 +13,7 @@ import time
 
 import numpy as np
 
+import floor as floor_mod
 import evade
 import plan as pl
 
@@ -22,6 +23,7 @@ YAW_ALPHA = 0.15        # how strongly each camera reading corrects the wheel-ba
 YAW_GATE_DEG = 18       # a reading this far from the wheel-based heading is treated as a glitch ...
 YAW_GATE_S = 1.2        # ... unless it persists this long, then the camera is believed (the wheel estimate has drifted)
 YAW_DELAY_S = 0.2       # how old a camera reading is (compared with where the wheels say we were THEN)
+TAPE_FIX_MAX_M = 0.15       # a floor-sensor correction bigger than this is ignored (misread)
 CONTACT_PROJECT_M = 0.34    # an opponent's balloon this close to our estimated position: assume we are in contact with it ...
 CONTACT_CENTRE_M = 0.13     # ... robot centre to robot centre when two rovers touch (MEASURE on the real rovers)
 CONTACT_BLEND = 0.15        # how much of the radial error to remove per camera frame
@@ -33,8 +35,12 @@ DEAD_RECKON_S = 1.5     # if the follower's marker is hidden (say an opponent's 
 
 
 class Pipeline:
-    def __init__(self, detector, ext, planner, chase, motors, read_ir, clock=time.time, publish=None, motion=None):
+    def __init__(self, detector, ext, planner, chase, motors, read_ir, clock=time.time, publish=None, motion=None, read_floor=None):
         self.detector, self.ext, self.planner = detector, ext, planner
+        self.read_floor = read_floor         # optional: () -> [left, middle, right] booleans "this floor sensor sees tape" (floor.py)
+        self._floor_t = -1e9
+        self._floor_flags = [False, False, False]
+        self._pose_dr = False                # the current pose is dead-reckoned (marker hidden), so a tape sighting may correct it
         self.motion = motion                 # () -> (left_cm_s, right_cm_s) of the wheel command in force (MotionTap)
         self._dr = None                      # last follower pose (t, x, y, yaw_deg), carried forward while hidden
         self._yaw = None                     # filtered heading (deg)
@@ -138,6 +144,48 @@ class Pipeline:
         st["follower"] = {"x": x, "y": y, "yaw": yaw, "age": 0.0, "dead_reckoned": True}
         return st
 
+    def floor_tape(self, now):
+        """Poll the floor colour sensors (at most 10 times a second). Returns the [left, middle, right] flags. When the pose is
+        only dead-reckoned and a sensor is on the tape although the estimate puts it inside the arena, move the estimate out
+        to the edge (the tape is a landmark)."""
+        if self.read_floor is None:
+            return [False, False, False]
+        if now - self._floor_t >= 0.1:
+            self._floor_t = now
+            try:
+                self._floor_flags = list(self.read_floor())
+            except Exception:
+                self._floor_flags = [False, False, False]
+            if any(self._floor_flags) and self._pose_dr and self.planner is not None and self.pose is not None:
+                self._tape_fix()
+        return self._floor_flags
+
+    def _tape_fix(self):
+        x, y, yaw, t = self.pose
+        arena = self.planner.arena
+        for i, on in enumerate(self._floor_flags):
+            if not on:
+                continue
+            sx, sy = floor_mod.sensor_world(x, y, yaw, i)
+            p = np.array([sx, sy])
+            if not pl.inside(arena.poly, p):
+                continue                                          # the estimate already has this sensor on/over the tape
+            c = pl._closest_on_boundary(arena.poly, p)
+            shift = c - p
+            if float(np.linalg.norm(shift)) > TAPE_FIX_MAX_M:
+                continue                                          # too far to be believable: a misread
+            x, y = x + float(shift[0]), y + float(shift[1])
+        self.pose = (x, y, yaw, t)
+        if self._dr is not None:
+            self._dr = (self._dr[0], x, y, self._dr[3])
+
+    def forward_speed(self):
+        """Forward speed of the wheel command in force, cm/s (0 if unknown)."""
+        if self.motion is None:
+            return 0.0
+        left, right = self.motion()
+        return (left + right) / 2.0
+
     def _contact_fix(self, st, x, y, yaw):
         """While the marker is hidden, an opponent that was in contact with us pushes us about and the wheel commands know nothing
         of it (the position drifts about 3.5 cm/s). But the camera still sees ITS balloon, and in contact we are a fixed
@@ -225,6 +273,7 @@ class Pipeline:
         f = st.get("follower")
         if f is not None:
             self.pose = (f["x"], f["y"], f["yaw"], now)
+            self._pose_dr = bool(f.get("dead_reckoned"))
         opps = {k: (v["x"], v["y"]) for k, v in st.items() if k != "follower"}
         if self.ext is not None:
             self.ext.update(st.get("follower"), opps, now, wall=now)

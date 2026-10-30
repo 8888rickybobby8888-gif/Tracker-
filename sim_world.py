@@ -428,6 +428,20 @@ def lidar_frame(snap, rng, lidar_back=0.05, own_balloon=True):
     return out.ravel()
 
 
+TAPE_WIDTH_M = 0.04              # the tape band outside the inner edge; beyond it the (light) room floor
+
+
+def floor_flags(follower):
+    """What the three floor colour sensors report: True where a sensor is over the tape band."""
+    import floor as floor_mod
+    flags = []
+    for i in range(3):
+        sx, sy = floor_mod.sensor_world(follower.x, follower.y, math.degrees(follower.yaw), i)
+        inner = min(sx - ARENA_RECT[0], ARENA_RECT[2] - sx, sy - ARENA_RECT[1], ARENA_RECT[3] - sy)
+        flags.append(-TAPE_WIDTH_M < inner < 0.0)
+    return flags
+
+
 def ir_cm(snap):
     """(left, right) distance in cm from the follower's sides, to robots and the no-go square."""
     x, y, yaw, _ = snap.agents["follower"]
