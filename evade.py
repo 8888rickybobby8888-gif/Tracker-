@@ -123,6 +123,7 @@ MAX_SPEED_CM_S = 30.0     # GLOBAL SPEED CAP for the wheels, applied to EVERY mo
                           # The rover itself tops out at 30. Change it live with set_max_speed(). Lower = safer.
 LIDAR_BACK_M = 0.05       # the lidar sits this far behind the rover's centre
 ALL_POPPED_CONFIRM_S = 1.5  # every opponent must stay gone this long before we believe the game is won and stop
+POP_TIP_M = 0.16          # popped = its balloon vanished within this of our pin tip (the camera is ~0.15 s old, we move ~0.2 m/s)
 GHOST_LOST_M = 0.30       # an opponent that disappears from the camera within this of you was probably just popped
 LIDAR_MATCH_M = 0.30      # a lidar object within this of a tracked opponent's balloon IS that opponent
 LIDAR_VETO_EXTRA_M = 0.15  # a still lidar object only counts if the camera sees an opponent within
@@ -332,6 +333,7 @@ class ExternalWatch:
         self.last_update_wall = None
         self._ring_until = -1e9
         self._active_until = {}                     # name -> time until which it counts as an ACTIVE opponent
+        self._last_pose = None                      # (x, y, yaw deg) the last time the follower's marker was seen
         self._last_fol = None                       # last position we ever had for the follower (kept when its marker is hidden)
         self._lost_recent = {}                      # name -> (x, y, t) of opponents that just vanished from the camera
         self._status = {}                           # name -> "live" | "popped" (vanished right beside us) | "lost" (vanished far off)
@@ -346,9 +348,8 @@ class ExternalWatch:
                 h = self._opp.pop(name)                   # lost: start its history afresh when it returns
                 if h:
                     self._lost_recent[name] = (h[-1][1], h[-1][2], t)
-                f = self._follower
                 self._gone_t = t
-                if h and f is not None and math.hypot(h[-1][1] - f["x"], h[-1][2] - f["y"]) <= GHOST_LOST_M:
+                if h and self._vanished_at_pin_tip(h[-1][1], h[-1][2]):
                     self._ghosts.append((h[-1][1], h[-1][2]))     # gone while we were on top of it: it was popped,
                     self._status[name] = "popped"                 # but its body is still there for the lidar to see
                 else:
@@ -360,6 +361,7 @@ class ExternalWatch:
             return self._decay(t)
         self._follower = follower
         self._last_fol = (follower["x"], follower["y"])
+        self._last_pose = (follower["x"], follower["y"], follower["yaw"])
         if self._ghosts:                                  # an opponent that is back in view near a ghost was not popped
             self._ghosts = [g for g in self._ghosts
                             if all(math.hypot(g[0] - o[0], g[1] - o[1]) > LIDAR_MATCH_M for o in opponents.values())]
@@ -445,6 +447,17 @@ class ExternalWatch:
             return False
         return any(math.hypot(h[-1][1] - f["x"], h[-1][2] - f["y"]) <= radius_m and t < self._active_until.get(n, -1e9)
                    for n, h in self._opp.items() if h)
+
+    def _vanished_at_pin_tip(self, bx, by):
+        """An opponent we POP vanishes at our pin tip, right in front of us. One that merely drops out of the camera's view
+        (hidden behind a robot, lost in a glare) does so anywhere, including beside or behind us."""
+        if self._last_pose is None:
+            return False
+        x, y, yaw = self._last_pose
+        a = math.radians(yaw)
+        tipx, tipy = x + PIN_REACH_M * math.cos(a), y + PIN_REACH_M * math.sin(a)
+        ahead = (bx - x) * math.cos(a) + (by - y) * math.sin(a)
+        return math.hypot(bx - tipx, by - tipy) <= POP_TIP_M and ahead > 0.0
 
     def pop_pending(self, t):
         """True in the moment right after the LAST opponent vanished right beside us (probably popped, not yet confirmed):

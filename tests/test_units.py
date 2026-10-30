@@ -33,8 +33,11 @@ pl.TAPE_MARGIN_M, pl.NOGO_MARGIN_M = 0.03, 0.07      # the route geometry checks
 P = pl.Planner(ARENA)
 r = pl.ROBOT_RADIUS_M + pl.NOGO_MARGIN_M
 sq = ARENA.nogo
-check("planner: grown no-go zone is the square grown by radius + margin",
-      all(abs(abs(c[0] - 0.6) - (0.075 + r)) < 1e-9 and abs(abs(c[1] - 0.55) - (0.075 + r)) < 1e-9 for c in P.block))
+def _dist_to_square(pt):
+    cx, cy, h = 0.6, 0.55, 0.075
+    return math.hypot(max(abs(pt[0] - cx) - h, 0.0), max(abs(pt[1] - cy) - h, 0.0))
+check("planner: grown no-go zone is the square grown by radius + margin, with round corners",
+      all(abs(_dist_to_square(c) - r) < 1e-9 for c in P.block) and len(P.block) > 4)
 check("planner: line through the square crosses it", pl.crosses(sq, (0.3, 0.55), (0.9, 0.55)))
 check("planner: line along an edge or clear of it does not", not pl.crosses(sq, (0.525, 0.3), (0.525, 0.9)) and not pl.crosses(sq, (0.2, 0.2), (0.2, 0.9)))
 
@@ -44,14 +47,20 @@ def length(path):
 
 
 def best_corner_route(planner, s, g):
-    C = [tuple(c) for c in planner.block]
-    best = float("inf")
-    for k in (1, 2):
-        for seq in itertools.permutations(C, k):
-            pts = [s] + list(seq) + [g]
-            if all(not pl.crosses(planner.block, pts[i], pts[i + 1]) for i in range(len(pts) - 1)):
-                best = min(best, sum(math.dist(pts[i], pts[i + 1]) for i in range(len(pts) - 1)))
-    return best
+    """Independent shortest path: Floyd-Warshall over start, goal and every vertex of the grown zone (visibility graph)."""
+    pts = [tuple(s), tuple(g)] + [tuple(c) for c in planner.block]
+    n = len(pts)
+    D = [[0.0 if i == j else float("inf") for j in range(n)] for i in range(n)]
+    for i in range(n):
+        for j in range(i + 1, n):
+            if not pl.crosses(planner.block, pts[i], pts[j]):
+                D[i][j] = D[j][i] = math.dist(pts[i], pts[j])
+    for k in range(n):
+        for i in range(n):
+            for j in range(n):
+                if D[i][k] + D[k][j] < D[i][j]:
+                    D[i][j] = D[i][k] + D[k][j]
+    return D[0][1]
 
 
 worst = 0.0
@@ -371,6 +380,33 @@ _ew2 = ev.ExternalWatch()
 for i in range(10): _ew2.update(_fol, {"A": (1.2, 0.3)}, i / 30, wall=i / 30)    # a far-off opponent that vanishes may only be hidden
 _ew2.update(_fol, {}, 1.0, wall=1.0)
 check("all popped: an opponent lost far away does not count as popped", not _ew2.all_popped(10.0))
+
+# ---- give up on a stalled target; "popped" only when it vanished at our pin tip ----
+_Ps = pl.Planner(ARENA)
+_f = {"x": 0.2, "y": 0.2, "yaw": 0.0}
+_names = []
+for _i in range(200):
+    _tt = _i * 0.1
+    _pl = _Ps.update({"follower": _f, "A": {"x": 1.0, "y": 0.2}, "B": {"x": 0.2, "y": 1.05}}, _tt)    # we never move: no progress on A
+    _names.append(_pl.target if _pl else None)
+check("planner: gives up on a target it is not getting closer to and switches to the other opponent",
+      _names[0] == "A" and _names[-1] == "B" and _names[100] in ("A", "B"), f"{_names[0]} ... {_names[-1]}")
+_Pm = pl.Planner(ARENA)
+_nm = []
+for _i in range(200):
+    _tt = _i * 0.1
+    _f2 = {"x": 0.2 + 0.004 * _i, "y": 0.2, "yaw": 0.0}                                            # we keep closing in on A
+    _pl = _Pm.update({"follower": _f2, "A": {"x": 1.0, "y": 0.2}, "B": {"x": 0.2, "y": 1.05}}, _tt)
+    _nm.append(_pl.target if _pl else None)
+check("planner: keeps its target while it is getting closer", set(_nm) == {"A"}, str(set(_nm)))
+_ew = ev.ExternalWatch()
+for _i in range(10): _ew.update({"x": 0.3, "y": 0.3, "yaw": 0.0}, {"A": (0.45, 0.3)}, _i / 30, wall=_i / 30)
+_ew.update({"x": 0.3, "y": 0.3, "yaw": 0.0}, {}, 1.0, wall=1.0)
+check("popped: a balloon that vanishes at our pin tip counts as popped", _ew._status.get("A") == "popped", str(_ew._status))
+_ew = ev.ExternalWatch()
+for _i in range(10): _ew.update({"x": 0.3, "y": 0.3, "yaw": 0.0}, {"B": (0.25, 0.42)}, _i / 30, wall=_i / 30)
+_ew.update({"x": 0.3, "y": 0.3, "yaw": 0.0}, {}, 1.0, wall=1.0)
+check("popped: one that vanishes beside/behind us (hidden by a robot) does NOT", _ew._status.get("B") == "lost", str(_ew._status))
 
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]

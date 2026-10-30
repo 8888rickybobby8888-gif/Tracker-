@@ -213,15 +213,28 @@ def scan_frame(frame, tr, exclude=()):
                       "warnings": warnings}}
 
 
+def _align(polys):
+    """Give every scan's corners the same starting corner as the first scan's. Each scan lists its corners counter-clockwise
+    from an arbitrary corner; for a square turned 45 degrees (a diamond) noise decides which corner comes first, and the
+    median of mismatched corners would be nonsense."""
+    ref = np.asarray(polys[0], float)
+    out = []
+    for p in polys:
+        p = np.asarray(p, float)
+        k = min(range(len(p)), key=lambda s: float(np.sum(np.linalg.norm(np.roll(p, -s, axis=0) - ref, axis=1))))
+        out.append(np.roll(p, -k, axis=0))
+    return np.array(out)
+
+
 def combine(results):
     """Median of several scans, plus how much they disagree (mm, worst corner spread)."""
-    A = np.array([r["arena"] for r in results])                          # (n, 4, 2)
+    A = _align([r["arena"] for r in results])                            # (n, 4, 2)
     arena = np.median(A, axis=0)
     spread = float(np.max(np.linalg.norm(A - arena, axis=2))) * 1000
     with_nogo = [r["nogo"] for r in results if r["nogo"]]
     nogo = None
     if len(with_nogo) > len(results) / 2:
-        N = np.array(with_nogo)
+        N = _align(with_nogo)
         nogo = np.median(N, axis=0)
         spread = max(spread, float(np.max(np.linalg.norm(N - nogo, axis=2))) * 1000)
     return ([tuple(map(float, p)) for p in arena], [tuple(map(float, p)) for p in nogo] if nogo is not None else None, spread)

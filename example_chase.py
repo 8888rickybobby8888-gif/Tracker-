@@ -12,11 +12,18 @@ to threats for the whole move.
 from micromelon import *
 
 
+_search = [0]                                       # how long we have been searching (calls)
+
+
 def chase(yaw):
-    if yaw is None:
-        Motors.write(8, 16)                         # nothing seen: creep round in a small circle, looking around (a spin on the
-                                                    # spot would stay hidden behind whatever is blocking the camera's view)
+    if yaw is None:                                 # nothing seen: look around. Mostly spin on the spot, and every few seconds
+        _search[0] += 1                             # creep a short way in a small circle, so we leave a spot where something
+        if _search[0] % 34 < 24:                    # (say a robot we popped) is hiding our marker from the camera. ~20 calls/s
+            Motors.write(-12, 12)
+        else:
+            Motors.write(8, 16)
         return
+    _search[0] = 0
     if abs(yaw) > 18:                               # well off target: turn almost on the spot first
         w = max(-20, min(20, 0.5 * yaw))            # + yaw = target on the left = turn left = left wheel back, right forward
         Motors.write(-w, w)

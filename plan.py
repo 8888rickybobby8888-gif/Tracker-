@@ -35,6 +35,9 @@ HYSTERESIS_M = 0.08        # keep the side you committed to unless the other sid
 LEAD_S = 0.4               # aim this far ahead of a moving opponent (camera + network delay)
 MIN_SPEED = 0.08           # m/s: slower than this, an opponent's heading is unknown
 BEHIND_M = evade.PIN_REACH_M   # goal distance behind the opponent's balloon point (where your pin meets its balloon)
+STALL_S = 14.0              # give up on a target we haven't got closer to (by STALL_PROGRESS_M) for this long ...
+STALL_PROGRESS_M = 0.05
+SKIP_S = 20.0               # ... and don't pick it again for this long (if another opponent is in play)
 ENGAGE_M = 0.25            # within this of the goal point, stop weaving and aim straight at the opponent
 WAYPOINT_REACHED_M = 0.05  # a waypoint closer than this counts as reached (the yaw to a point a few cm away is noise)
 HISTORY_S = 0.5            # window for measuring an opponent's velocity
@@ -73,15 +76,45 @@ def offset_convex(poly, d):
     return out
 
 
+def offset_rounded(poly, d, step_deg=30.0):
+    """A convex polygon grown by d in every direction with ROUND corners (what a robot of radius d really sweeps out), as
+    a convex polygon with a vertex every step_deg round each corner. Mitred corners (offset_convex) stick out by
+    d*(sqrt(2)-1) more, which for a polygon turned 45 degrees closes the corridors beside it."""
+    P = ccw(poly)
+    n = len(P)
+    out = []
+    for i in range(n):
+        e0 = P[i] - P[i - 1]
+        e1 = P[(i + 1) % n] - P[i]
+        a0 = math.atan2(-e0[0], e0[1])                      # outward normal of the edge into this vertex
+        a1 = math.atan2(-e1[0], e1[1])                      # ... and of the edge out of it
+        turn = (a1 - a0 + math.pi) % (2 * math.pi) - math.pi
+        k = max(1, int(math.ceil(abs(math.degrees(turn)) / step_deg)))
+        for j in range(k + 1):
+            a = a0 + turn * j / k
+            out.append(P[i] + d * np.array([math.cos(a), math.sin(a)]))
+    return out
+
+
 def inside(poly, p, eps=0.0):
     P = ccw(poly)
     p = np.asarray(p, float)
     return all(_cross(P[(i + 1) % len(P)] - P[i], p - P[i]) >= -eps for i in range(len(P)))
 
 
+_INNER = {}
+
+
 def crosses(poly, a, b):
     """True if the segment a-b passes through the INTERIOR of the convex polygon (touching is fine)."""
-    inner = offset_convex(poly, -1e-4)
+    hit = _INNER.get(id(poly))
+    if hit is not None and hit[0] is poly:                           # the shrunk polygon is the same every call: cache it
+        inner = hit[1]
+    else:
+        inner = offset_convex(poly, -1e-4)
+        if len(_INNER) > 64:
+            _INNER.clear()
+        _INNER[id(poly)] = (poly, inner)
     a, b = np.asarray(a, float), np.asarray(b, float)
     d = b - a
     t0, t1 = 0.0, 1.0
@@ -170,9 +203,12 @@ class Planner:
     def __init__(self, arena, target="nearest"):
         self.arena = arena
         self.free = offset_convex(arena.poly, -(ROBOT_RADIUS_M + TAPE_MARGIN_M))
-        self.block = offset_convex(arena.nogo, ROBOT_RADIUS_M + NOGO_MARGIN_M) if arena.nogo else None
+        self.block = offset_rounded(arena.nogo, ROBOT_RADIUS_M + NOGO_MARGIN_M) if arena.nogo else None
         self.target_pref = target
         self._target = None
+        self._best_d, self._best_t = None, None          # closest we have got to the current target, and when
+        self._now = 0.0
+        self._skip = {}                                   # name -> time until which we won't choose it again (it stalled us)
         self._last_via = None
         self._hist = {}
         self.last = None
@@ -253,18 +289,31 @@ class Planner:
         d = {k: math.hypot(v[0] - fx, v[1] - fy) for k, v in opps.items()}
         if self.target_pref != "nearest":
             return self.target_pref if self.target_pref in opps else None
-        if self._target in d:                              # fixate: keep the current target while it is still in play
-            return self._target
-        self._target = min(d, key=d.get)
+        now = self._now
+        self._skip = {k: t for k, t in self._skip.items() if t > now}
+        if self._target in d:                              # fixate: keep the current target while it is still in play ...
+            dt = d[self._target]
+            if self._best_d is None or dt < self._best_d - STALL_PROGRESS_M:
+                self._best_d, self._best_t = dt, now
+            elif now - self._best_t > STALL_S and len(d) > 1:         # ... unless we have stopped getting closer to it
+                self._skip[self._target] = now + SKIP_S                # (unreachable, or it keeps dodging us): try another
+                self._target = None
+            else:
+                return self._target
+        pool = {k: v for k, v in d.items() if k not in self._skip} or d
+        self._target = min(pool, key=pool.get)
+        self._best_d, self._best_t = d[self._target], now
         return self._target
 
     def set_target(self, name):
         """Retarget (used when we had to evade that opponent). Ignored for a fixed --target or an unknown name."""
-        if self.target_pref == "nearest" and name:
+        if self.target_pref == "nearest" and name and name != self._target:
             self._target = name
+            self._best_d, self._best_t = None, None
 
     # ---- main entry -----------------------------------------------------------------------
     def update(self, state, now):
+        self._now = now
         """state: tracker.py state {"follower": {x,y,yaw}, "A": {x,y}, ...}. Returns a Plan or None."""
         f = state.get("follower")
         opps = {k: (v["x"], v["y"]) for k, v in state.items() if k != "follower"}

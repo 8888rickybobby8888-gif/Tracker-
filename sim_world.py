@@ -42,6 +42,9 @@ BALLOON_BACK = 0.10              # rover centre -> balloon, backwards (a stick o
 BALLOON_Z, BALLOON_R = 0.15, 0.045
 tk.TOP_MARKER_OFFSET = (0.02, 0.0)   # the follower's marker sits slightly forward of centre, away from its own balloon
 BODY_CIRCLE = 0.07               # used for lidar returns and collisions
+NOGO_VIOLATION_M = BODY_CIRCLE   # a violation is counted when the follower's centre is closer than this to the no-go zone ...
+TAPE_VIOLATION_M = 0.06          # ... or than this to the inner edge of the tape (about half the rover's length). THE REAL PENALTY RULE IS
+                                 # UNKNOWN: change these two to match it and every sweep and video follows.
 COLLIDE = 0.13                   # centre-to-centre distance below which two robots push each other apart
 POP_DIST = 0.045                 # pin tip within this of a balloon pops it
 
@@ -274,10 +277,10 @@ class World:
         f = self.follower
         c = dist_point_poly(f.x, f.y, NOGO)
         self.min_nogo_clear = min(self.min_nogo_clear, c)
-        if c < BODY_CIRCLE:
+        if c < NOGO_VIOLATION_M:
             self.nogo_viol += 1
         inner = min(f.x - ARENA_RECT[0], ARENA_RECT[2] - f.x, f.y - ARENA_RECT[1], ARENA_RECT[3] - f.y)
-        if inner < 0.06:
+        if inner < TAPE_VIOLATION_M:
             self.tape_viol += 1
 
 
