@@ -66,3 +66,18 @@ settings.
 So against ONE hunter the follower wins roughly 70-85% of the fights (it depends on the code version and seed set), and every change I made
 to the fight itself traded survival for something else. What would be left is a different kind of idea (not committing to the nearest
 opponent for the first second, or using the opponent's heading when it is known), not tuning.
+
+## Making the keep-out zone round the no-go diamond smaller
+Asked for: "a little smaller". The keep-out is the robot radius (0.08) plus `NOGO_MARGIN_M`.
+| `NOGO_MARGIN_M` (fixed) | Survived | Won | Violation-free runs |
+|---|---|---|---|
+| 0.13 (before) | 325/380 | 264 | 269 |
+| 0.10 | 295 | 192 | 110 |
+| 0.08 | 295 | 197 | 102 |
+Finer steps, 12 seeds: 0.13 -> 168/228 violation-free; 0.12 -> 124; 0.115 -> 92; 0.11 -> 98. So it is a cliff, not a slope: with a smaller zone the
+route hugs the diamond and the hunter's shoves (and the steering overshoot) put the rover over the no-go limit (`hunter` scenario: 0 -> 55-175
+no-go frames). A fixed smaller zone is therefore NOT acceptable.
+
+What was kept: a TWO-SIZE zone. While any opponent is moving (or was in the last 3 s) the full 0.13 margin is used; while nothing moves, `NOGO_MARGIN_CALM_M`
+= 0.09 (0.54 m across instead of 0.62 m, 12% smaller). Same sweep, 12 seeds: 163/228 violation-free vs 168/228 for the fixed 0.13 (inside the noise),
+calm scenarios unchanged. The shoves only happen when something is moving, so the smaller zone costs nothing there.

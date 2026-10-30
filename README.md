@@ -206,8 +206,9 @@ point behind the target (where your pin meets its balloon). Close to that point 
 - `--target A` chases a particular colour slot (default `nearest`); `--no-plan` switches planning off.
 - The live view draws the arena, the no-go zone (and its grown outline), the path, the next waypoint and the goal.
 - Tuning numbers are at the top of `plan.py`: `ROBOT_RADIUS_M` (MEASURE: half the rover's longest side), `NOGO_MARGIN_M` and
-  `TAPE_MARGIN_M` (how far the route keeps from the no-go zone and the tape; now 0.13 and 0.12 on top of the radius, which cut tape and
-  no-go violations a lot in simulation), `BEHIND_M`, `ENGAGE_M`, `LEAD_S`. The no-go zone is grown with ROUND corners (what a round
+  `TAPE_MARGIN_M` (how far the route keeps from the no-go zone and the tape on top of the radius). `NOGO_MARGIN_M` = 0.13 applies while any
+  opponent is moving; while nothing moves the smaller `NOGO_MARGIN_CALM_M` = 0.09 is used (the keep-out is then 0.54 m across instead of 0.62 m).
+  Do not just shrink `NOGO_MARGIN_M`: 0.12 instead of 0.13 took violation-free runs from 74% to 54% in simulation, `BEHIND_M`, `ENGAGE_M`, `LEAD_S`. The no-go zone is grown with ROUND corners (what a round
   robot sweeps out), so a turned square still leaves room to pass.
 - **Which opponent is the target** (`plan.TARGET_MODE`, default `"sticky"`): the nearest, then it STAYS on it (no flipping between two
   opponents at similar distances); it switches to an opponent the rover had to defend against (`pipeline.RETARGET_ON_THREAT`); and it
