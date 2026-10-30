@@ -22,6 +22,9 @@ YAW_ALPHA = 0.15        # how strongly each camera reading corrects the wheel-ba
 YAW_GATE_DEG = 18       # a reading this far from the wheel-based heading is treated as a glitch ...
 YAW_GATE_S = 1.2        # ... unless it persists this long, then the camera is believed (the wheel estimate has drifted)
 YAW_DELAY_S = 0.2       # how old a camera reading is (compared with where the wheels say we were THEN)
+DEAD_RECKON_NEAR_M = 0.5    # "right beside us" for the longer dead-reckoning window below
+DEAD_RECKON_CLOSE_S = 5.0   # ... and this long while an opponent is right beside us: that is when the camera tends to lose us
+                        # (the opponent blocks its view) and when we most need to know where we are
 DEAD_RECKON_S = 1.5     # if the follower's marker is hidden (say an opponent's balloon is in the way), carry its last
                         # pose forward from the wheel commands for up to this long, then give up
 
@@ -109,7 +112,12 @@ class Pipeline:
             self._dr = (now, f["x"], f["y"], f["yaw"])
             self._dr_last = now
             return st
-        if self._dr is None or self.motion is None or now - self._dr[0] > DEAD_RECKON_S:
+        limit = DEAD_RECKON_S
+        if self.ext is not None and self._dr is not None:
+            fx, fy = self._dr[1], self._dr[2]
+            if any(math.hypot(v["x"] - fx, v["y"] - fy) <= DEAD_RECKON_NEAR_M for k, v in st.items() if k != "follower"):
+                limit = DEAD_RECKON_CLOSE_S
+        if self._dr is None or self.motion is None or now - self._dr[0] > limit:
             return st
         t0, x, y, yaw = self._dr
         dt = max(now - (self._dr_last if self._dr_last is not None else now), 0.0)

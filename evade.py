@@ -93,6 +93,7 @@ ESCAPE_RELEASE_M = 0.03   # it keeps escaping until it is this much further clea
 ESCAPE_DRIVE = True       # when no opponent is close, drive away from the no-go zone / tape edge (no longer fights the defence)
 SOFT_NOGO_M = 0.30        # HOLD GROUND: while FACING an opponent, from this far out (centre to the no-go zone) ...
 SOFT_TAPE_M = 0.25        # ... or the tape, push back toward the opponent so it can't shove us over the edge
+HOLD_WHEN_LOST_M = 0.5    # no pose for chase() (marker hidden) and an opponent within this: stand still instead of searching
 BACKOFF_SPEED = 0         # cm/s, OFF: backing away from a slower opponent in our face (set e.g. 28 to try). On the full renderer it lost more often (3 pops in 8 seeds vs 1)
 BACKOFF_M = 0.35          # start backing off when its balloon is this close (to our centre) ...
 BACKOFF_RELEASE_M = 0.55  # ... and keep going until the gap is this big, then let the normal chase run (it can't catch us)
@@ -330,6 +331,7 @@ class ExternalWatch:
         self.last_update_wall = None
         self._ring_until = -1e9
         self._active_until = {}                     # name -> time until which it counts as an ACTIVE opponent
+        self._last_fol = None                       # last position we ever had for the follower (kept when its marker is hidden)
         self._status = {}                           # name -> "live" | "popped" (vanished right beside us) | "lost" (vanished far off)
         self._gone_t = -1e9                         # when the last opponent vanished
         self._ghosts = []                           # (x, y) of opponents that vanished right beside us: almost surely popped
@@ -353,6 +355,7 @@ class ExternalWatch:
             self._confirm = 0
             return self._decay(t)
         self._follower = follower
+        self._last_fol = (follower["x"], follower["y"])
         if self._ghosts:                                  # an opponent that is back in view near a ghost was not popped
             self._ghosts = [g for g in self._ghosts
                             if all(math.hypot(g[0] - o[0], g[1] - o[1]) > LIDAR_MATCH_M for o in opponents.values())]
@@ -465,6 +468,12 @@ class ExternalWatch:
         if near:
             return all(t >= self._active_until.get(n, -1e9) for n in near)
         return any(math.hypot(gx - ox, gy - oy) <= LIDAR_MATCH_M for gx, gy in self._ghosts)
+
+    def any_near_last_seen(self, radius_m):
+        """True if a tracked opponent is within radius_m of where the follower was LAST seen (works while its marker is hidden)."""
+        if self._last_fol is None:
+            return False
+        return any(math.hypot(h[-1][1] - self._last_fol[0], h[-1][2] - self._last_fol[1]) <= radius_m for h in self._opp.values() if h)
 
     def distance(self, name):
         """Floor distance from the follower's centre to the opponent's tracked balloon, or None."""
@@ -825,6 +834,10 @@ class Brain:
                 return "hold"                                  # mid-cooldown with a threat about: don't chase into its pin
         elif self.facing is not None and self.facing.active:
             self.facing.stop()
+        if (yaw is None and HOLD_WHEN_LOST_M and self.external is not None and self.external.alive(now)
+                and self.external.any_near_last_seen(HOLD_WHEN_LOST_M)):
+            return self._park("hold")                      # we've lost sight of our own marker with an opponent in our
+                                                           # face: don't go searching blindly (that turns our balloon to it)
         global EVADE_LATENCY_EXTRA_S
         t0 = self.clock()
         self.chase(yaw)
