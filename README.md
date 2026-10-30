@@ -1,5 +1,49 @@
 # Follower/leader tracker (yaw + degrees to leader)
 
+## Quick start
+
+### How to run it (real rover)
+One-time setup:
+
+    pip install -r requirements.txt             # opencv-contrib, numpy, micromelon, pillow
+    python make_markers.py                      # print markers_sheet.pdf at 100%; floor marker ID 8, follower marker ID 0
+    python tracker.py --list                    # find the external camera (press Y on the right one)
+    python scan_arena.py --camera 1             # saves arena.json (tape + no-go square); or mark_arena.py to click the corners
+
+Each match:
+
+    python follow.py --camera 1                 # external camera + rear lidar + your chase code (my_chase.py)
+
+- Put your chase moves in `my_chase.py` (`example_chase.py` is a complete working version to copy from).
+- In the live window: click a balloon to set its colour (keys 1/2/3 pick the slot), `P` or space = **pause / resume**
+  (the rover stands still while paused), `[` `]` tune the field of view, `F` re-lock the floor, `Esc` quit.
+- It stops by itself once every opponent has been popped. Ctrl+C in the terminal also stops the rover.
+- Useful options: `--max-speed 20` (cap the wheels), `--target A` (always chase slot A), `--no-lidar`, `--no-plan`,
+  `--rover 2` (Bluetooth ID), `--flip` (mirrored image). Details are further down.
+
+### How to run the simulator (no camera, rover or ESP32 needed)
+
+    python run_tests.py                         # compile + unit + screen/script + follow.py + arena-scan tests (1-2 minutes)
+    python run_tests.py --sim                   # plus the full-render scenarios (several more minutes)
+    python simulate.py hunter                   # one scenario with a video: chase_around, start_beside_nogo, hunter, three_calm
+    python simulate.py hunter --no-video        # same, without the video (faster)
+
+`simulate.py` writes the video and key frames to `sim_output/`. The video shows the simulated external camera (real
+tracker and planner overlay), a top-down truth map and a timeline. The summary it prints counts no-go and tape violations
+and whether the follower was popped. Real code under test: tracker, planner, evasion and the Micromelon Motors module;
+only the world, the sensors and the rover are simulated.
+
+Many runs at once, on the fast simulator (no pictures, about 20x faster, replays measured tracker noise):
+
+    python tests/sweep_hunter.py --label mine   # 14 hunter cases x 10 seeds, writes tests/sweep_mine.json
+    python tests/compare_sweeps.py baseline mine
+
+The simulator only tests the software, not the real hardware (camera latency, Bluetooth rate, lidar, field of view).
+It is also kinder than the full renderer for the hunter case: judge changes on `simulate.py` runs over several seeds
+(the `run_scenario(name, seed=N)` function in `simulate.py`), not on the fast simulator alone.
+
+---
+
 No robot control, no chessboard calibration.
 - FOLLOWER: one ArUco marker lying flat on top -> position + yaw
 - LEADER: a coloured balloon (colour only) -> position on the floor
@@ -65,7 +109,7 @@ if you ever want to lock it once instead).
     --lidar-port 4210 (default)   --no-lidar (no evasion!)   --rover 1 (Bluetooth ID)
 
 - YOU write `chase(yaw)` in `my_chase.py` (paste Python from your blocks; `yaw` is degrees to turn to face the
-  opponent, + = left, None = not seen). Keep each call short.
+  opponent, + = left, None = not seen). Set wheel speeds and return (see `example_chase.py`): do not wait inside it.
 - I wrote the evasion (`evade.py`). It has two sources and evades if EITHER reports a threat:
   - the rear lidar: something close and closing in from behind (covers the rear even if the external camera is blocked);
   - the external camera: any opponent that is moving, aimed at you, and predicted to reach you within ~2 s, from ANY
