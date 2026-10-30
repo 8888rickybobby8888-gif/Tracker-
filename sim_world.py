@@ -527,6 +527,7 @@ class SimMotors:
         rc.writeAttribute, rc.doMotorOperation, rc.connectedRobotIsSimulated = link.writeAttribute, link.doMotorOperation, link.connectedRobotIsSimulated
         self.tap = self.tap_cls(OPTYPE.MOTOR_SET)
         self.tap.install(rc)                                              # speed cap + motion estimate, as on the rover
+        ev.install_speed_clamp(micromelon.Motors)                         # (and the same clamp follow.py installs)
         return self
 
     def __exit__(self, *exc):

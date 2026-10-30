@@ -480,6 +480,15 @@ _mt[:] = [0.0, 0.0]; _ck5[0] = 12.0; _pipe._floor_t = -1e9
 _m5 = _br5.step(0.0)
 check("floor sensors: standing still on the tape does not trigger the guard", _m5 != "tape", _m5)
 
+# ---- P1: wheel speeds are clamped, not an error ----
+_calls = []
+_mm = types.SimpleNamespace(write=lambda l, r, *a: _calls.append((l, r)))
+ev.install_speed_clamp(_mm); ev.install_speed_clamp(_mm)                                   # twice: must not stack
+_mm.write(35, -40); _mm.write(10, 12)
+ev.set_max_speed(18); _mm.write(25, -25); ev.set_max_speed(30)
+check("speed clamp: out-of-range wheel speeds are clamped to the cap (micromelon would raise), in-range ones pass",
+      _calls == [(30.0, -30.0), (10.0, 12.0), (18.0, -18.0)], str(_calls))
+
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]
 for r_ in failed:

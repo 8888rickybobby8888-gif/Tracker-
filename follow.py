@@ -107,6 +107,7 @@ def main(argv=None):
     rc.connectBLE(args.rover)
     rc.startRover()
 
+    evade.install_speed_clamp(Motors)                       # a chase that asks for 31 cm/s is clamped, not an error
     tap = evade.MotionTap(OPTYPE.MOTOR_SET)
     tap.install(rc)                                         # learn own speed/turning from motor commands
 

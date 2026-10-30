@@ -156,6 +156,21 @@ def set_max_speed(cm_s):
     return MAX_SPEED_CM_S
 
 
+def install_speed_clamp(motors_module):
+    """The micromelon module RAISES if a wheel speed is outside -30..30 (and the sim's gains can push 29.x to 30.x). A chase that does
+    22 + a steering term can go over, and the brain loop would then stop the wheels on every step. Wrap Motors.write so speeds are
+    CLAMPED to the global cap instead (idempotent)."""
+    real = getattr(motors_module, "write")
+    if getattr(real, "_clamped", False):
+        return
+    def write(left, right, *args, **kwargs):
+        cap = min(30.0, MAX_SPEED_CM_S)
+        return real(max(-cap, min(cap, float(left))), max(-cap, min(cap, float(right))), *args, **kwargs)
+    write._clamped = True
+    write._real = real
+    motors_module.write = write
+
+
 def evade_speed():
     """Speed used for the evasive spin: EVADE_SPEED, but never above the global cap (and never zero)."""
     return max(1.0, min(EVADE_SPEED, MAX_SPEED_CM_S))
