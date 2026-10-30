@@ -78,6 +78,22 @@ if last:
     check("tracker.main: opponent positions within 4 cm", max(errs.values()) < 0.04, " ".join(f"{k} {v*1000:.0f}mm" for k, v in errs.items()))
 check("tracker.main: no blank/invalid frames shown", gui["bad_image"] == 0)
 
+# ---------------- 1b. tracker.main: the pause key (P / space) and the status line ----------------
+pk = {"paused": False, "keys": [], "msgs": []}
+def _on_key(k):
+    pk["keys"].append(k)
+    if k in (ord("p"), ord(" ")): pk["paused"] = not pk["paused"]
+def _status():
+    msg = "PAUSED (P or space = resume)" if pk["paused"] else ""
+    pk["msgs"].append(msg)
+    return msg
+gui.update(i=0, shown=0, script={5: ord("p"), 12: ord(" "), 14: ord("p"), 20: 27})
+tk.main(0, None, on_key=_on_key, status=_status)
+check("pause key: P and space reach the on_key callback, other frames send nothing", pk["keys"] == [ord("p"), ord(" "), ord("p")], str(pk["keys"]))
+check("pause key: the status line is asked for on every frame and shows PAUSED only between the presses",
+      len(pk["msgs"]) >= 18 and pk["msgs"][2] == "" and pk["msgs"][7].startswith("PAUSED") and pk["msgs"][13] == "" and pk["msgs"][16].startswith("PAUSED"),
+      f"{len(pk['msgs'])} frames: " + ",".join("P" if m else "-" for m in pk["msgs"][:20]))
+
 # ---------------- 2. mark_arena.main: click the arena + no-go corners while the camera drifts ----------------
 cam.t = 0.0
 saved = {}

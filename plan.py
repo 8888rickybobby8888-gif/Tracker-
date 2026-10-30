@@ -327,7 +327,8 @@ class Planner:
             dt = d[self._target]
             if self._best_d is None or dt < self._best_d - STALL_PROGRESS_M:
                 self._best_d, self._best_t = dt, now
-            elif now - self._best_t > STALL_S and len(d) > 1:         # ... unless we have stopped getting closer to it
+                return self._target                                    # getting closer: stay on it
+            if now - self._best_t > STALL_S and len(d) > 1:            # ... unless we have stopped getting closer to it
                 self._skip[self._target] = now + SKIP_S                # (unreachable, or it keeps dodging us): try another
                 self._target = None
             else:

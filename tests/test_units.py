@@ -489,6 +489,49 @@ ev.set_max_speed(18); _mm.write(25, -25); ev.set_max_speed(30)
 check("speed clamp: out-of-range wheel speeds are clamped to the cap (micromelon would raise), in-range ones pass",
       _calls == [(30.0, -30.0), (10.0, 12.0), (18.0, -18.0)], str(_calls))
 
+# ---- P8: the heading filter runs through a hidden-marker gap, and a glitchy reading when the marker returns is gated ----
+_wheels = [0.0, 0.0]
+_ph = _pp.Pipeline(ev.ChaserDetector(4), ev.ExternalWatch(), None, lambda y: None,
+                   types.SimpleNamespace(stop=lambda: None, write=lambda l, r: None), None, motion=lambda: tuple(_wheels))
+_fo = {"A": {"x": 1.0, "y": 0.0}}
+def _st(yaw, seen=True):
+    d = dict(_fo)
+    if seen: d["follower"] = {"x": 0.3, "y": 0.0, "yaw": yaw, "age": 0.0}
+    return d
+_t = 0.0
+for _i in range(30):                                        # 1 s with the marker seen at heading 0, standing still
+    _ph.on_state(_st(0.0), _t); _t += 1 / 30
+_wheels[:] = [-6.0, 6.0]                                   # then turn left on the spot at 12/18.7 rad/s = 36.8 deg/s ...
+_gap_t0 = _t
+for _i in range(36):                                        # ... for 1.2 s (inside DEAD_RECKON_S) with the marker HIDDEN
+    _ph.on_state(_st(0.0, seen=False), _t); _t += 1 / 30
+_expect = math.degrees(12.0 / ev.WHEELBASE_CM) * 1.2         # what the wheels say we turned
+_wheels[:] = [0.0, 0.0]
+_dr_yaw = _ph.pose[2]
+check("heading filter: through a 1.2 s gap the heading follows the wheel commands", abs(_dr_yaw - _expect) < 6, f"{_dr_yaw:.0f} deg vs wheels {_expect:.0f}")
+_ph.on_state(_st(_expect + 45.0), _t); _t += 1 / 30          # the marker returns with a reading that is 45 degrees wrong (a robot half-covers it)
+_first = _ph.pose[2]
+check("heading filter: a reading 45 degrees off when the marker returns is NOT adopted at once", abs(_first - _expect) < 12, f"{_first:.0f} deg vs wheels {_expect:.0f}")
+for _i in range(int(1.6 * 30)):                              # ... but if it persists (a real change) it is believed
+    _ph.on_state(_st(_expect + 45.0), _t); _t += 1 / 30
+check("heading filter: ... and it IS believed once it has persisted", abs(_ph.pose[2] - (_expect + 45.0)) < 15, f"{_ph.pose[2]:.0f} deg")
+
+# ---- P10: whoever made us defend becomes the target (Brain -> Pipeline -> Planner) ----
+def _wired():
+    return _pp.Pipeline(ev.ChaserDetector(4), ev.ExternalWatch(), pl.Planner(ARENA), lambda y: None,
+                        types.SimpleNamespace(stop=lambda: None, write=lambda l, r: None), None, motion=lambda: (0.0, 0.0))
+_pw = _wired()
+_S = {"follower": {"x": 0.2, "y": 0.2, "yaw": 0.0, "age": 0.0}, "A": {"x": 0.5, "y": 0.2}, "B": {"x": 0.2, "y": 0.9}}
+_pw.on_state(_S, 0.0)
+check("retarget wiring: the nearest opponent is the first target", _pw.last_plan is not None and _pw.last_plan.target == "A")
+_pw.brain.defended_who = "B"
+_pw.on_state(_S, 0.1)
+check("retarget wiring: the opponent we had to defend against becomes the target", _pw.last_plan.target == "B", _pw.last_plan.target)
+_pw2 = _wired(); _pp.RETARGET_ON_THREAT = False
+_pw2.on_state(_S, 0.0); _pw2.brain.defended_who = "B"; _pw2.on_state(_S, 0.1)
+check("retarget wiring: ... unless RETARGET_ON_THREAT is switched off", _pw2.last_plan.target == "A", _pw2.last_plan.target)
+_pp.RETARGET_ON_THREAT = True
+
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]
 for r_ in failed:
