@@ -23,6 +23,7 @@ YAW_ALPHA = 0.15        # how strongly each camera reading corrects the wheel-ba
 YAW_GATE_DEG = 18       # a reading this far from the wheel-based heading is treated as a glitch ...
 YAW_GATE_S = 1.2        # ... unless it persists this long, then the camera is believed (the wheel estimate has drifted)
 YAW_DELAY_S = 0.2       # how old a camera reading is (compared with where the wheels say we were THEN)
+RETARGET_ON_THREAT = True   # when we had to defend against an opponent, make it the new target
 TAPE_FIX_MAX_M = 0.15       # a floor-sensor correction bigger than this is ignored (misread)
 CONTACT_PROJECT_M = 0.34    # an opponent's balloon this close to our estimated position: assume we are in contact with it ...
 CONTACT_CENTRE_M = 0.13     # ... robot centre to robot centre when two rovers touch (MEASURE on the real rovers)
@@ -278,7 +279,8 @@ class Pipeline:
         if self.ext is not None:
             self.ext.update(st.get("follower"), opps, now, wall=now)
         if self.planner is not None:
-            self.planner.set_target(self.brain.defended_who)   # whoever made us evade becomes the new target
+            if RETARGET_ON_THREAT:
+                self.planner.set_target(self.brain.defended_who)   # whoever made us evade becomes the new target
             p = self.planner.update(st, now)
             self.last_plan = p
             self._set(p.yaw_to_waypoint if p else None, p.yaw_to_target if p else None)

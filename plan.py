@@ -35,6 +35,8 @@ HYSTERESIS_M = 0.08        # keep the side you committed to unless the other sid
 LEAD_S = 0.4               # aim this far ahead of a moving opponent (camera + network delay)
 MIN_SPEED = 0.08           # m/s: slower than this, an opponent's heading is unknown
 BEHIND_M = evade.PIN_REACH_M   # goal distance behind the opponent's balloon point (where your pin meets its balloon)
+TARGET_MODE = "sticky"      # how a target is chosen: "sticky" (nearest, then fixate), "switch" (always the nearest, re-checked every
+                            # frame), "active_first" (the nearest MOVING opponent first), "calm_first" (the nearest STILL one first)
 STALL_S = 14.0              # give up on a target we haven't got closer to (by STALL_PROGRESS_M) for this long ...
 STALL_PROGRESS_M = 0.05
 SKIP_S = 20.0               # ... and don't pick it again for this long (if another opponent is in play)
@@ -208,6 +210,7 @@ class Planner:
         self._target = None
         self._best_d, self._best_t = None, None          # closest we have got to the current target, and when
         self._now = 0.0
+        self._active_until = {}                           # name -> time until which it counts as an ACTIVE opponent
         self._skip = {}                                   # name -> time until which we won't choose it again (it stalled us)
         self._last_via = None
         self._hist = {}
@@ -290,6 +293,12 @@ class Planner:
         if self.target_pref != "nearest":
             return self.target_pref if self.target_pref in opps else None
         now = self._now
+        if TARGET_MODE == "switch":                        # the original rule: always the nearest, switching only for a clear gain
+            best = min(d, key=d.get)
+            if self._target in d and d[self._target] <= d[best] + 0.10:
+                best = self._target
+            self._target = best
+            return best
         self._skip = {k: t for k, t in self._skip.items() if t > now}
         if self._target in d:                              # fixate: keep the current target while it is still in play ...
             dt = d[self._target]
@@ -301,6 +310,12 @@ class Planner:
             else:
                 return self._target
         pool = {k: v for k, v in d.items() if k not in self._skip} or d
+        active = {k: v for k, v in pool.items() if now < self._active_until.get(k, -1e9)}
+        calm = {k: v for k, v in pool.items() if k not in active}
+        if TARGET_MODE == "active_first" and active:       # hunt the hunter: the nearest opponent that is moving
+            pool = active
+        elif TARGET_MODE == "calm_first" and calm:         # leave the hunter alone: the nearest one that is not moving
+            pool = calm
         self._target = min(pool, key=pool.get)
         self._best_d, self._best_t = d[self._target], now
         return self._target
@@ -321,6 +336,9 @@ class Planner:
             if name not in opps:
                 del self._hist[name]
         vel = {name: self._velocity(name, now, x, y) for name, (x, y) in opps.items()}
+        for name, v in vel.items():                        # which opponents are ACTIVE (seen moving in the last few seconds)
+            if v and math.hypot(*v) >= evade.RING_MIN_SPEED:
+                self._active_until[name] = now + evade.ACTIVE_HOLD_S
         if not f or not opps:
             self.last = None
             return None
