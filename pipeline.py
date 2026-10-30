@@ -22,6 +22,9 @@ YAW_ALPHA = 0.15        # how strongly each camera reading corrects the wheel-ba
 YAW_GATE_DEG = 18       # a reading this far from the wheel-based heading is treated as a glitch ...
 YAW_GATE_S = 1.2        # ... unless it persists this long, then the camera is believed (the wheel estimate has drifted)
 YAW_DELAY_S = 0.2       # how old a camera reading is (compared with where the wheels say we were THEN)
+CONTACT_PROJECT_M = 0.34    # an opponent's balloon this close to our estimated position: assume we are in contact with it ...
+CONTACT_CENTRE_M = 0.13     # ... robot centre to robot centre when two rovers touch (MEASURE on the real rovers)
+CONTACT_BLEND = 0.15        # how much of the radial error to remove per camera frame
 DEAD_RECKON_NEAR_M = 0.5    # "right beside us" for the longer dead-reckoning window below
 DEAD_RECKON_CLOSE_S = 5.0   # ... and this long while an opponent is right beside us: that is when the camera tends to lose us
                         # (the opponent blocks its view) and when we most need to know where we are
@@ -125,6 +128,7 @@ class Pipeline:
         yaw += math.degrees((right - left) / evade.WHEELBASE_CM) * dt
         x += (left + right) / 200.0 * math.cos(math.radians(yaw)) * dt
         y += (left + right) / 200.0 * math.sin(math.radians(yaw)) * dt
+        x, y = self._contact_fix(st, x, y, yaw)
         self._dr, self._dr_last = (t0, x, y, yaw), now
         if YAW_FILTER:                                         # keep the heading filter running through the gap, so a glitchy
             self._yaw, self._yaw_t = evade.wrap(yaw), now      # reading when the marker reappears (a robot half-covering it)
@@ -133,6 +137,25 @@ class Pipeline:
         st = dict(st)
         st["follower"] = {"x": x, "y": y, "yaw": yaw, "age": 0.0, "dead_reckoned": True}
         return st
+
+    def _contact_fix(self, st, x, y, yaw):
+        """While the marker is hidden, an opponent that was in contact with us pushes us about and the wheel commands know nothing
+        of it (the position drifts about 3.5 cm/s). But the camera still sees ITS balloon, and in contact we are a fixed
+        distance from it, in front of its pin: its centre is BALLOON_BACK_M ahead of its balloon, towards us, and the two
+        centres are CONTACT_CENTRE_M apart. So pull our estimate radially to that distance from its balloon."""
+        best = None
+        for k, v in st.items():
+            if k == "follower":
+                continue
+            d = math.hypot(x - v["x"], y - v["y"])
+            if best is None or d < best[0]:
+                best = (d, v["x"], v["y"])
+        if best is None or best[0] > CONTACT_PROJECT_M or best[0] < 1e-6:
+            return x, y
+        d, bx, by = best
+        want = evade.BALLOON_BACK_M + CONTACT_CENTRE_M
+        k = CONTACT_BLEND * (want - d) / d
+        return x + (x - bx) * k, y + (y - by) * k
 
     def escape(self, now):
         """BOUNDARY ESCAPE: None, or {"away": heading in degrees that leads out of trouble, "yaw": our heading} when the

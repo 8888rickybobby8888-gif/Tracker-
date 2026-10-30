@@ -430,6 +430,16 @@ time.sleep(1.4); _stop.set(); _t.join(2)
 check("fail-safe: an error in chase() stops the wheels (it never leaves them on the last command)", _sm4.stops >= 2 and _br4.errors >= ev.MAX_BRAIN_ERRORS,
       f"{_sm4.stops} stops, {_br4.errors} errors")
 
+# ---- dead reckoning in contact: pulled to the contact distance from the opponent's balloon ----
+import pipeline as _pp
+_x, _y = 0.50, 0.00
+for _ in range(60):
+    _x, _y = _pp.Pipeline._contact_fix(None, {"B": {"x": 0.20, "y": 0.00}}, _x, _y, 0.0)
+check("dead reckoning: in contact, the estimate is pulled to the contact distance from the opponent's balloon",
+      abs((_x - 0.20) - (ev.BALLOON_BACK_M + _pp.CONTACT_CENTRE_M)) < 0.005 and abs(_y) < 1e-9, f"x={_x:.3f}")
+_x2, _y2 = _pp.Pipeline._contact_fix(None, {"B": {"x": 0.20, "y": 0.00}}, 0.90, 0.0, 0.0)
+check("dead reckoning: an opponent far away changes nothing", (_x2, _y2) == (0.90, 0.0))
+
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]
 for r_ in failed:
