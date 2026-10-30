@@ -95,6 +95,14 @@ SOFT_NOGO_M = 0.30        # HOLD GROUND: while FACING an opponent, from this far
 SOFT_TAPE_M = 0.25        # ... or the tape, push back toward the opponent so it can't shove us over the edge
 LOST_KEEP_S = 4.0         # an opponent that vanished from the camera this recently is still treated as "beside us" for that rule
 HOLD_WHEN_LOST_M = 0.5    # no pose for chase() (marker hidden) and an opponent within this: stand still instead of searching
+SIDESTEP_SPEED = 0        # cm/s, 0 = OFF. SIDESTEP: stuck facing a slower opponent that has been in contact for SIDESTEP_AFTER_S, pivot 90
+                          # degrees to the side with more open floor and drive off at this speed: it passes us and we outrun it.
+SIDESTEP_AFTER_S = 0.8    # in contact this long before we sidestep
+SIDESTEP_CONTACT_M = 0.30 # "in contact" = its balloon within this of our centre
+SIDESTEP_RUN_S = 1.0      # drive off for this long, then the normal logic takes over again
+SIDESTEP_NEAR_EDGE_ONLY = True   # only sidestep once we are within SOFT_TAPE_M / SOFT_NOGO_M of an edge
+SIDESTEP_COOLDOWN_S = 3.0
+SIDESTEP_ROOM_M = 0.45    # the side we run to must be free floor for this far
 BACKOFF_SPEED = 0         # cm/s, OFF: backing away from a slower opponent in our face (set e.g. 28 to try). On the full renderer it lost more often (3 pops in 8 seeds vs 1)
 BACKOFF_M = 0.35          # start backing off when its balloon is this close (to our centre) ...
 BACKOFF_RELEASE_M = 0.55  # ... and keep going until the gap is this big, then let the normal chase run (it can't catch us)
@@ -748,6 +756,9 @@ class Brain:
         self.facing = FacingTracker(motors, clock) if (TRACK_FACING and motors is not None and hasattr(motors, "write")) else None
         self._last_mode = None
         self.defended_who = ""                               # last opponent we had to defend against (the planner retargets it)
+        self._contact_since = None                           # when we first stood in contact with the current opponent
+        self._side = None                                    # sidestep in progress: {"phase", "t0", "rel", "yaw0"}
+        self._side_cool = -1e9
         self._tape_until = -1e9                              # floor-sensor tape guard: back off until this time
         self._cam_lost = False                               # the no-camera fail-safe has stopped us
         self.errors = 0                                      # consecutive errors in run()
@@ -770,6 +781,49 @@ class Brain:
         else:
             steer = max(-6.0, min(6.0, 0.3 * e))
             m.write(sign * speed - steer, sign * speed + steer)
+
+    def _sidestep(self, threat, now):
+        """Sidestep a slower opponent that has us pinned: True while it is driving the wheels."""
+        g = self.guard
+        if self._side is None:
+            d = self.external.distance(threat.who) if self.external is not None else None
+            if d is None or d > SIDESTEP_CONTACT_M or now < self._side_cool or g is None or not hasattr(g, "clear_toward"):
+                self._contact_since = None
+                return False
+            if self._contact_since is None:
+                self._contact_since = now
+            if now - self._contact_since < SIDESTEP_AFTER_S:
+                return False
+            if SIDESTEP_NEAR_EDGE_ONLY and g.edge_push(now) is None:
+                return False                                # only when the shove is taking us toward the tape / no-go zone
+            best = None                                     # the side with free floor, preferring the one nearer the arena middle
+            for rel in (90.0, -90.0):
+                p = g.clear_toward(now, rel, SIDESTEP_ROOM_M)
+                if p is not None and (best is None or g.centre_dist(p) < best[0]):
+                    best = (g.centre_dist(p), rel)
+            if best is None or g.pose is None:
+                return False
+            self._side = {"phase": "turn", "t0": now, "rel": wrap(threat.turn_deg + best[1]) if threat.turn_deg is not None else best[1],
+                          "yaw0": g.pose[2]}
+            if self.facing is not None and self.facing.active:
+                self.facing.stop()
+        s = self._side
+        m = self.evader.motors
+        v = min(SIDESTEP_SPEED, evade_speed())
+        if s["phase"] == "turn":
+            err = wrap(s["yaw0"] + s["rel"] - g.pose[2]) if g is not None and g.pose is not None else 0.0
+            if abs(err) < 12.0 or now - s["t0"] > 1.2:
+                s["phase"], s["t0"] = "run", now
+            else:
+                w = max(-25.0, min(25.0, 0.6 * err))
+                m.write(-w, w)
+                return True
+        if s["phase"] == "run":
+            if now - s["t0"] < SIDESTEP_RUN_S:
+                m.write(v, v)
+                return True
+        self._side, self._side_cool, self._contact_since = None, now + SIDESTEP_COOLDOWN_S, None
+        return False
 
     def _park(self, mode):
         """Stand still (paused, or every opponent popped). The stop is re-sent about once a second, so a lost Bluetooth
@@ -857,6 +911,9 @@ class Brain:
             if threat.who:
                 self.defended_who = threat.who
             turn = threat.turn_deg if threat.turn_deg is not None else wrap(180.0 - threat.offset_deg)
+            if facing_now and SIDESTEP_SPEED and self._sidestep(threat, now):
+                self._last_mode = "sidestep"
+                return "sidestep"
             if facing_now:
                 theta = turn if abs(turn) < BEHIND_DEG else self.evader.plan(threat)   # dead behind: IR picks the side
                 # an edge is near: keep facing the opponent but also back away from the edge along our own axis

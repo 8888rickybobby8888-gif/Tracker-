@@ -37,6 +37,9 @@ MIN_SPEED = 0.08           # m/s: slower than this, an opponent's heading is unk
 BEHIND_M = evade.PIN_REACH_M   # goal distance behind the opponent's balloon point (where your pin meets its balloon)
 TARGET_MODE = "adaptive"     # how a target is chosen: "sticky" (nearest, then fixate), "switch" (always the nearest, re-checked every
                             # frame), "active_first" (the nearest MOVING opponent first), "calm_first" (the nearest STILL one first), "adaptive" (sticky, but a still one first while 2+ are moving)
+AVOID_R_M = 0.0             # >0 = route AROUND moving opponents that are not the target: a keep-out circle of this radius (m) on where each will be
+                            # in AVOID_LEAD_S. 0 = off. A hunter is slower than we are, so keeping clear of it means it never gets to push us.
+AVOID_LEAD_S = 0.8
 STALL_S = 14.0              # give up on a target we haven't got closer to (by STALL_PROGRESS_M) for this long ...
 STALL_PROGRESS_M = 0.05
 SKIP_S = 20.0               # ... and don't pick it again for this long (if another opponent is in play)
@@ -210,6 +213,7 @@ class Planner:
         self._target = None
         self._best_d, self._best_t = None, None          # closest we have got to the current target, and when
         self._now = 0.0
+        self.avoid = []                                   # keep-out polygons round moving non-target opponents (see AVOID_R_M)
         self._active_until = {}                           # name -> time until which it counts as an ACTIVE opponent
         self._skip = {}                                   # name -> time until which we won't choose it again (it stalled us)
         self._last_via = None
@@ -226,15 +230,20 @@ class Planner:
         return p
 
     def route(self, start, goal):
-        """Shortest path start -> goal inside the arena, round the no-go zone. Returns (path, blocked)."""
+        """Shortest path start -> goal inside the arena, round the no-go zone (and any keep-out circles). Returns (path, blocked)."""
         s = self._free_point(start)
         g = self._free_point(goal)
-        corners = [c for c in (self.block or []) if inside(self.free, c)]
+        obst = ([self.block] if self.block is not None else []) + [a for a in self.avoid if not inside(a, s) and not inside(a, g)]
+        corners = []
+        for k, poly in enumerate(obst):
+            for c in poly:
+                if inside(self.free, c) and not any(inside(o, c) for j, o in enumerate(obst) if j != k):
+                    corners.append(c)
         nodes = [s, g] + corners
         n = len(nodes)
 
         def visible(i, j):
-            return self.block is None or not crosses(self.block, nodes[i], nodes[j])
+            return not any(crosses(o, nodes[i], nodes[j]) for o in obst)
 
         moved = float(np.linalg.norm(s - np.asarray(start, float))) > 1e-6     # start was too close: step out first
         if visible(0, 1):
@@ -286,6 +295,20 @@ class Planner:
         while h and t - h[0][0] > HISTORY_S:
             h.popleft()
         return evade._velocity(h)
+
+    def _avoid_polys(self, target, opps, vel, now):
+        """A keep-out octagon round where each MOVING opponent (other than the target) will be in AVOID_LEAD_S. Centres are rounded
+        to 5 cm so the route does not flicker with every camera frame."""
+        out = []
+        for name, (x, y) in opps.items():
+            if name == target or now >= self._active_until.get(name, -1e9):
+                continue
+            v = vel.get(name) or (0.0, 0.0)
+            cx = round((x + v[0] * AVOID_LEAD_S) / 0.05) * 0.05
+            cy = round((y + v[1] * AVOID_LEAD_S) / 0.05) * 0.05
+            out.append([(cx + AVOID_R_M * math.cos(math.radians(a)), cy + AVOID_R_M * math.sin(math.radians(a)))
+                        for a in range(0, 360, 45)])
+        return out
 
     def _choose(self, f, opps):
         fx, fy = f["x"], f["y"]
@@ -349,6 +372,7 @@ class Planner:
             self.last = None
             return None
 
+        self.avoid = self._avoid_polys(name, opps, vel, now) if AVOID_R_M > 0 else []
         F = np.array([f["x"], f["y"]], float)
         O = np.array(opps[name], float)
         v = vel[name]

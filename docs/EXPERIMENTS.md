@@ -47,3 +47,21 @@ By scenario (survived / cleared of 60):
 - Adaptive matches the best method for two hunters and loses a little (42 vs 49 survived of 60) against a single hunter. That gap is about
   1.2 standard errors, so it may be noise. "Active" means seen moving at 0.05 m/s or more in the last 3 s, so it depends on the camera's
   speed noise staying below that (unmeasured on the real camera).
+
+## Seed 13 (full render, `hunter`): what it is and what was tried
+What happens: at t=0 the hunter B is the NEAREST opponent and still, so the follower targets it (and fixates). B starts moving, the two meet
+head-on at about 3 s, and the fight is close to a coin flip: sometimes the follower pops B as it swings past, sometimes B shoves the passive
+follower 0.5 m past the tape, the camera loses it outside the arena, and it is popped. Seed 13 is one of the bad outcomes with the default
+settings.
+
+| Tried | Result |
+|---|---|
+| Back away from B (`BACKOFF_SPEED=28`) | Fixes seed 13 (win, 0 violations) but over 16 full-render seeds: **4 wins / 10 pops** vs the default's **11 wins / 3 pops**. Off. |
+| Sidestep (`SIDESTEP_SPEED=26`): pivot 90 degrees to the open side and drive off | Fast sim, 300 runs: survived 221 vs 251, but violation-free runs 238 vs 207. The pops happen DURING the pivot (the balloon swings next to B's pin). Off. |
+| Hold ground (`HOLD_SPEED`) | Survival 245 -> 176-197 of 300. Off. |
+| Route round moving non-target opponents (`plan.AVOID_R_M`) | No effect: here the opponent to avoid IS the target. Off. |
+| Take a still opponent first, leave the hunter (`calm_first`) | One hunter + 2 still: 25 vs 49 survived of 60. The follower is safer fighting the hunter than ignoring it. |
+
+So against ONE hunter the follower wins roughly 70-85% of the fights (it depends on the code version and seed set), and every change I made
+to the fight itself traded survival for something else. What would be left is a different kind of idea (not committing to the nearest
+opponent for the first second, or using the opponent's heading when it is known), not tuning.

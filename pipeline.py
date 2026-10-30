@@ -214,16 +214,28 @@ class Pipeline:
     def clear_behind(self, now, dist_m):
         """True if the floor dist_m straight behind the rover is free: inside the tape (with the planner's margins) and clear
         of the no-go zone. False when unknown (no arena or a stale pose)."""
+        return self.clear_toward(now, 180.0, dist_m) is not None
+
+    def clear_toward(self, now, rel_deg, dist_m):
+        """The point dist_m away in the direction rel_deg from our heading (+ = left), if the straight line to it is free floor
+        (inside the tape with the planner's margins, clear of the no-go zone); else None (also None when the pose is unknown)."""
         if self.planner is None or self.pose is None or now - self.pose[3] > 0.6:
-            return False
+            return None
         x, y, yaw, _ = self.pose
+        a = math.radians(yaw + rel_deg)
+        p = None
         for k in range(1, int(dist_m / 0.05) + 1):
-            p = np.array([x - k * 0.05 * math.cos(math.radians(yaw)), y - k * 0.05 * math.sin(math.radians(yaw))])
+            p = np.array([x + k * 0.05 * math.cos(a), y + k * 0.05 * math.sin(a)])
             if not pl.inside(self.planner.free, p):
-                return False
+                return None
             if self.planner.block is not None and pl.inside(self.planner.block, p):
-                return False
-        return True
+                return None
+        return p
+
+    def centre_dist(self, p):
+        """Distance from a floor point to the middle of the arena (to prefer the side of a sidestep that heads for open floor)."""
+        c = np.mean(np.array(self.planner.arena.poly), axis=0)
+        return float(np.linalg.norm(np.asarray(p) - c))
 
     def edge_push(self, now):
         """HOLD-GROUND zone: like escape() but starting further out (SOFT_*_M), and with "depth" 0..1 = how deep into that
