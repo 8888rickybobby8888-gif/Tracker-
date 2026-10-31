@@ -38,7 +38,7 @@ LEAD_S = 0.4               # aim this far ahead of a moving opponent (camera + n
 MIN_SPEED = 0.08           # m/s: slower than this, an opponent's heading is unknown
 BEHIND_M = evade.PIN_REACH_M   # goal distance behind the opponent's balloon point (where your pin meets its balloon)
 TARGET_MODE = "sticky"       # how a target is chosen: "sticky" (nearest, then fixate), "switch" (always the nearest, re-checked every
-                            # frame), "active_first" (the nearest MOVING opponent first), "calm_first" (the nearest STILL one first), "adaptive" (sticky, but a still one first while 2+ are moving)
+                            # frame), "active_first" (the nearest MOVING opponent first), "calm_first" (the nearest STILL one first), "adaptive" (sticky, but a still one first while 2+ are moving), "kite" (sticky, but as soon as the target starts moving and a still opponent exists, switch to the still one: use with AVOID_R_M > 0 to run round the hunter instead of fighting it)
 AVOID_R_M = 0.0             # >0 = route AROUND moving opponents that are not the target: a keep-out circle of this radius (m) on where each will be
                             # in AVOID_LEAD_S. 0 = off. A hunter is slower than we are, so keeping clear of it means it never gets to push us.
 AVOID_LEAD_S = 0.8
@@ -327,6 +327,12 @@ class Planner:
             self._target = best
             return best
         self._skip = {k: t for k, t in self._skip.items() if t > now}
+        if TARGET_MODE == "kite" and self._target in d and now < self._active_until.get(self._target, -1e9):
+            calm = {k: v for k, v in d.items() if k not in self._skip and now >= self._active_until.get(k, -1e9)}
+            if calm:                                       # our target has started moving (a hunter?): go for a still one and keep clear of it
+                self._target = min(calm, key=calm.get)
+                self._best_d, self._best_t = d[self._target], now
+                return self._target
         if self._target in d:                              # fixate: keep the current target while it is still in play ...
             dt = d[self._target]
             if self._best_d is None or dt < self._best_d - STALL_PROGRESS_M:
