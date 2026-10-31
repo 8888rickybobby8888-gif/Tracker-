@@ -4,6 +4,8 @@ follow.py - runs everything together.
     python follow.py --camera 1                           external camera + markers (tracker.py)
     python follow.py --onboard http://<esp32>:81/stream   the follower's own camera (onboard.py)
     python follow.py --onboard bridge --lidar-serial COM5 the follower's own camera AND lidar through the ESP-NOW bridge (no WiFi)
+    python follow.py --camera 1 --onboard http://<esp32>:81/stream   TANDEM: both cameras (external primary, onboard sharpens the facing)
+    python follow.py --camera 1 --onboard bridge --lidar-serial COM5  the same, camera + lidar over ESP-NOW
     add  --lidar-port 4210   (default) for the rear lidar;  --no-lidar to run without evasion
 
 What runs
@@ -15,7 +17,7 @@ What runs
   brain thread    each step: a chaser closing in, seen by the rear lidar OR by the external camera (from ANY
                   direction) -> evade (turn to face it); otherwise call YOUR chase(yaw) from my_chase.py
 
-With --onboard there is no external camera, so evasion uses the rear lidar only.
+With --onboard ALONE there is no external camera, so evasion uses the rear lidar only.
 
 Press Esc in the video window to stop. The motors are stopped and the rover disconnected on exit.
 Ctrl+C in the terminal also stops the rover.
@@ -116,12 +118,13 @@ def main(argv=None):
     tap = evade.MotionTap(OPTYPE.MOTOR_SET)
     tap.install(rc)                                         # learn own speed/turning from motor commands
 
-    ext = None if args.onboard else evade.ExternalWatch()      # external camera: chasers from any direction
+    tandem = bool(args.onboard) and args.camera is not None      # --camera N --onboard SRC: BOTH cameras, external is primary
+    ext = None if (args.onboard and not tandem) else evade.ExternalWatch()      # external camera: chasers from any direction
     if ext is None:
         print("Onboard camera mode: evasion uses the rear lidar only (no external camera).")
 
     planner = None
-    if not args.onboard and not args.no_plan:
+    if (not args.onboard or tandem) and not args.no_plan:
         arena = plan.load_arena()
         if arena:
             planner = plan.Planner(arena, args.target)
@@ -154,6 +157,14 @@ def main(argv=None):
             ap.error("--onboard bridge needs --lidar-serial PORT (the bridge's USB port carries the camera frames too)")
         import onboard
         jpeg_src = onboard.JpegFrameSource()
+    feed = None
+    if tandem:
+        import onboard
+        import tracker as _trk
+        cam = jpeg_src if jpeg_src is not None else onboard.LatestFrame(args.onboard)
+        feed = onboard.OnboardFeed(cam, onboard.MultiTracker(_trk.OPPONENT_HSV),
+                                   lambda b, t: pipe.on_onboard(b, time.time()))
+        print("TANDEM: external camera = primary, the follower's own camera sharpens the facing when the marker is hidden.")
     on_frame = lambda vals, t: pipe.on_lidar(vals, t, tap.forward_mm_s, tap.rotating, time.time())
     if args.no_lidar:
         print("Running without the rear lidar: " + ("evasion uses the external camera only (blind to a chaser it can't see)."
@@ -176,7 +187,7 @@ def main(argv=None):
         return "PAUSED (P or space = resume)" if brain.paused else ("ALL OPPONENTS POPPED: stopped" if brain._last_mode == "done" else "")
 
     threads = [threading.Thread(target=brain.run, args=(stop, lambda: yaw_to_leader), daemon=True)]
-    if receiver or ext:
+    if receiver or ext or feed:
         def watchdog():
             warned = {}
             time.sleep(5)
@@ -186,6 +197,8 @@ def main(argv=None):
                     sources.append(("lidar", detector.lidar_alive()))
                 if ext:
                     sources.append(("external camera", ext.alive()))
+                if feed:
+                    sources.append(("onboard camera", feed.alive()))
                 for name, alive in sources:
                     if not alive and not warned.get(name):
                         print(f"WARNING: no {name} data. That part of the evasion is OFF until it comes back.")
@@ -199,7 +212,7 @@ def main(argv=None):
         t.start()
 
     try:
-        if args.onboard:
+        if args.onboard and not tandem:
             import onboard
             onboard.main(None if jpeg_src is not None else args.onboard, on_yaw=_publish, cam=jpeg_src)
         else:
@@ -212,6 +225,8 @@ def main(argv=None):
         stop.set()
         for t in threads:
             t.join(timeout=2)
+        if feed:
+            feed.close()
         if receiver:
             receiver.close()
         try:

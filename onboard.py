@@ -160,6 +160,68 @@ class OnboardTracker:
         return None
 
 
+BALLOON_DIAM_M = 0.09       # real balloon diameter, for range from apparent size (MEASURE)
+
+
+class MultiTracker:
+    """TANDEM mode: bearing AND range of every opponent balloon (one HSV range per slot, the same slots/colours as tracker.py) in the
+    follower's own picture. bearings(frame) -> {slot: (bearing_deg relative to the rover's front, + = left; range_m)}."""
+
+    def __init__(self, hsv_by_slot, fov_deg=FOV_DEG, min_area=MIN_BLOB_AREA):
+        self.hsv, self.fov_deg, self.min_area = {k: list(v) for k, v in hsv_by_slot.items()}, fov_deg, min_area
+        self._one = OnboardTracker(fov_deg)
+
+    def bearings(self, frame):
+        h, w = frame.shape[:2]
+        f = (w / 2.0) / math.tan(math.radians(self.fov_deg) / 2.0)
+        out = {}
+        for slot, ranges in self.hsv.items():
+            self._one.hsv = ranges
+            cnts, _ = cv2.findContours(self._one.mask(frame), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if not cnts:
+                continue
+            c = max(cnts, key=cv2.contourArea)
+            if cv2.contourArea(c) < self.min_area:
+                continue
+            m = cv2.moments(c)
+            cx = m["m10"] / m["m00"]
+            width_px = max(cv2.boundingRect(c)[2], 1)
+            brg = math.degrees(math.atan2((w / 2.0) - cx, f)) + MOUNT_YAW_DEG
+            out[slot] = (_wrap(brg), BALLOON_DIAM_M * f / width_px)
+        return out
+
+
+class OnboardFeed:
+    """Runs MultiTracker on a camera (LatestFrame / JpegFrameSource) in a background thread and calls on_bearings(bearings, t) with the time the
+    picture ARRIVED. The external camera stays the primary source; this only sharpens the facing (see evade.Brain)."""
+
+    def __init__(self, cam, tracker, on_bearings, hz=15.0):
+        self.cam, self.tr, self.cb, self.dt = cam, tracker, on_bearings, 1.0 / hz
+        self._stop, self.last_t, self.frames = False, 0.0, 0
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def alive(self, now=None):
+        return self.last_t > 0 and (time.time() if now is None else now) - self.last_t < 1.5
+
+    def _run(self):
+        seen = 0.0
+        while not self._stop:
+            frame, t = self.cam.read()
+            if frame is None or t == seen:
+                time.sleep(0.01)
+                continue
+            seen = t
+            try:
+                self.cb(self.tr.bearings(frame), t)
+                self.last_t, self.frames = t, self.frames + 1
+            except Exception as e:                        # a bad picture must never stop the follower
+                print("onboard feed:", repr(e))
+            time.sleep(self.dt)
+
+    def close(self):
+        self._stop = True
+
+
 def draw_overlay(frame, tr, yaw):
     h, w = frame.shape[:2]
     cv2.line(frame, (w // 2, 0), (w // 2, h), (90, 90, 90), 1, cv2.LINE_AA)          # straight ahead

@@ -675,6 +675,24 @@ _o = _swo.onboard_bearings(_snap, _rng, bearing_noise_deg=0.0, range_noise=0.0)
 check("sim onboard camera: sees the balloon ahead (A: bearing about +18 deg, left) and not the one behind (B) or outside the field of view (C)",
       set(_o) == {"A"} and 15 < _o["A"][0] < 22, str(_o))
 
+# ---- tandem: multi-colour onboard measurer + feed thread
+_img = np.zeros((240, 320, 3), np.uint8)
+cv2.circle(_img, (80, 120), 12, (255, 0, 0), -1)                            # BLUE (BGR) left of centre, 24 px wide
+cv2.circle(_img, (260, 120), 6, (0, 255, 255), -1)                           # YELLOW right of centre, 12 px wide
+_mt = ob.MultiTracker({"A": [((100, 120, 60), (130, 255, 255))], "B": [((40, 100, 60), (80, 255, 255))], "C": [((20, 120, 100), (35, 255, 255))]})
+_bm = _mt.bearings(_img)
+check("MultiTracker: sees blue (left, +) and yellow (right, -), not green; the smaller blob is farther",
+      set(_bm) == {"A", "C"} and _bm["A"][0] > 10 and _bm["C"][0] < -10 and _bm["C"][1] > 1.8 * _bm["A"][1], str(_bm))
+class _FakeCam:
+    def __init__(self): self.n = 0
+    def read(self):
+        self.n += 1
+        return _img.copy(), 1000.0 + self.n
+_got = []
+_feed = ob.OnboardFeed(_FakeCam(), _mt, lambda b, t: _got.append(b), hz=200.0)
+time.sleep(0.4); _feed.close()
+check("OnboardFeed: calls back with bearings from its own thread and reports alive", len(_got) >= 3 and "A" in _got[0], str(len(_got)))
+
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]
 for r_ in failed:
