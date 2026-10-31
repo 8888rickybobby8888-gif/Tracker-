@@ -1,6 +1,6 @@
 # Handoff: Micromelon "pop the balloon" follower robot
 
-Current state of the project. Read this first, then `README.md` (how to run things) and `docs/EXPERIMENTS.md` (what was tried and
+Current state of the project. Read this first, then `README.md` (how to run things), `docs/CODE_TOUR.md` (every file in depth) and `docs/EXPERIMENTS.md` (what was tried and
 the numbers). **Everything described as "tested" was tested in simulation only. Nothing has run on the real camera, rover, ESP32
 or lidar.**
 
