@@ -28,7 +28,7 @@ Conventions
 import math
 import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -139,6 +139,13 @@ EXT_CONFIRM_FRAMES = 3
 EXT_CLEAR_S = 0.5
 NO_CAMERA_STOP_S = 0.8    # FAIL-SAFE: no frame from the external camera for this long -> the rover stops (it resumes by itself when
                           # frames come back). Chasing on the last picture would drive it blind.
+USE_ONBOARD = True        # use the follower's OWN camera too when it is running (follow.py --camera N --onboard SRC): its bearing to an opponent
+                          # is measured from the rover's own front, so it needs no heading, position or marker
+ONBOARD_FRESH_S = 0.4     # an onboard reading older than this (seconds since it arrived) is ignored
+ONBOARD_DELAY_S = 0.15    # how old an onboard reading is when it arrives (capture + network): fresher than the external camera's TRACK_DELAY_S
+ONBOARD_SUSTAIN_S = 2.0   # keep facing an opponent the external camera has lost for this long, as long as our own camera still sees it close
+ONBOARD_CLOSE_M = 0.45    # ... and it is within this range of us
+ONBOARD_FRONT_DEG = 70    # ... and within this angle of straight ahead
 TAPE_BACKOFF_S = 0.5      # floor sensors: back off this long after one sees tape while we were driving forward
 TAPE_BACKOFF_SPEED = 18   # cm/s
 TAPE_FORWARD_MIN_CM_S = 3.0
@@ -617,10 +624,11 @@ class FacingTracker:
             total += prev_w * (now - max(prev_t, t0))
         return total
 
-    def step(self, theta_meas, now, v_extra=0.0):
+    def step(self, theta_meas, now, v_extra=0.0, delay_s=None):
         """theta_meas: bearing of the opponent relative to your heading (+ = left), as last measured by the camera.
         v_extra: a forward (+) / backward (-) speed in cm/s to move at while turning (used to back away from an edge)."""
         theta_meas = wrap(theta_meas)
+        delay = TRACK_DELAY_S if delay_s is None else delay_s            # how old this reading is (the onboard camera's is fresher)
         dt = 0.05 if self._t is None else max(0.01, min(0.5, now - self._t))
         if self._theta is None:
             self._theta = theta_meas
@@ -628,7 +636,7 @@ class FacingTracker:
         else:
             pred = wrap(self._theta + (self._rate - self._w) * dt)             # our turning shrinks it, its circling grows it
             if theta_meas != self._last_in:                                    # a NEW camera reading (not the same one again)
-                fwd = wrap(theta_meas - self._turned_since(now - TRACK_DELAY_S, now) + self._rate * TRACK_DELAY_S)
+                fwd = wrap(theta_meas - self._turned_since(now - delay, now) + self._rate * delay)
                 innov = wrap(fwd - pred)
                 if abs(innov) > TRACK_GATE_DEG and self._bad < TRACK_GATE_MAX:
                     self._bad += 1
@@ -793,6 +801,8 @@ class Brain:
         self._contact_since = None                           # when we first stood in contact with the current opponent
         self._side = None                                    # sidestep in progress: {"phase", "t0", "rel", "yaw0"}
         self._side_cool = -1e9
+        self._last_threat = None                             # (who, time): the last external threat we were facing (the onboard camera can carry it on)
+        self.onboard_used = 0                                # steps in which the follower's own camera replaced or carried on the external bearing
         self._tape_until = -1e9                              # floor-sensor tape guard: back off until this time
         self._cam_lost = False                               # the no-camera fail-safe has stopped us
         self.errors = 0                                      # consecutive errors in run()
@@ -929,6 +939,24 @@ class Brain:
             lid = Threat()          # the camera says that object is an opponent that is parked or already popped: it can't
                                     # pop us unless WE swing our balloon into its pin, and turning away is exactly that move
         threat = self.fuse(lid, self.external.state(now) if self.external else Threat())
+        ob = self.guard.onboard(now) if (USE_ONBOARD and self.guard is not None and hasattr(self.guard, "onboard")) else {}
+        ob_used = False
+        if ob and threat.active and threat.who in ob and threat.source in ("external", "both"):
+            brg = ob[threat.who][0]                          # our own camera sees it: that bearing needs no heading, position or marker
+            threat = replace(threat, turn_deg=brg, offset_deg=wrap(180.0 - brg))
+            ob_used = True
+        elif (ob and not threat.active and self._last_threat is not None and now - self._last_threat[1] <= ONBOARD_SUSTAIN_S
+              and self._last_threat[0] in ob):
+            who = self._last_threat[0]                       # the external camera has lost the follower or the opponent, but our own still sees it close
+            brg, rng = ob[who]
+            if rng <= ONBOARD_CLOSE_M and abs(brg) <= ONBOARD_FRONT_DEG:
+                threat = Threat(True, offset_deg=wrap(180.0 - brg), min_mm=rng * 1000.0, turn_deg=brg, source="external", who=who)
+                ob_used = True
+        if threat.active and threat.who and threat.source in ("external", "both") and not ob_used:
+            self._last_threat = (threat.who, now)
+        elif ob_used:
+            self._last_threat = (threat.who, now)
+            self.onboard_used += 1
         if not threat.active and self.external is not None and (self.external.all_popped(now) or self.external.pop_pending(now)):
             return self._park("done")                      # every opponent is popped: the game is won, stand still
         facing_now = (threat.active and self.facing is not None and threat.source in ("external", "both")
@@ -967,7 +995,7 @@ class Brain:
                         self._backing = False
                     if self._backing:
                         nudge = -min(BACKOFF_SPEED, evade_speed())      # reverse, still facing it, until it falls behind
-                self.facing.step(theta, now, nudge)
+                self.facing.step(theta, now, nudge, delay_s=ONBOARD_DELAY_S if ob_used else None)
                 self._last_mode = "track"
                 return "track"
             if DEFEND and threat.source in ("external", "both") and abs(turn) <= HOLD_FACING_DEG:

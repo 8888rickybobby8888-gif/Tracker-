@@ -620,6 +620,61 @@ _src = _ob.JpegFrameSource(); _src.push(_jpg)
 _fr, _t = _src.read()
 check("JpegFrameSource: decodes a pushed JPEG into a frame the onboard tracker can read", _fr is not None and _fr.shape == (120, 160, 3) and _t > 0)
 
+# ---- the follower's own camera works in tandem with the external one ----
+class _FakeExt:
+    """Stands in for ExternalWatch: a threat from opponent A whose external bearing is WRONG (the heading estimate is off)."""
+    def __init__(self): self.threat = ev.Threat(True, offset_deg=130.0, min_mm=200, turn_deg=50.0, source="external", who="A")
+    def state(self, now): return self.threat
+    def alive(self, now): return True
+    def age(self, now): return 0.0
+    def all_popped(self, now): return False
+    def pop_pending(self, now): return False
+    def any_active_within(self, r, t): return True
+    def any_within(self, r): return True
+    def any_near_last_seen(self, r, t): return True
+    def distance(self, name): return 0.2
+    def lidar_object_is_inactive(self, *a): return False
+    last_update_wall = 0.0
+def _ob_brain(ob_data):
+    spy = []
+    ext = _FakeExt(); clock = [10.0]
+    guard = types.SimpleNamespace(escape=lambda now: None, onboard=lambda now: ob_data[0])
+    br = ev.Brain(ev.ChaserDetector(4), types.SimpleNamespace(motors=StopMotors(), ready=lambda now: True), lambda y: None, external=ext, clock=lambda: clock[0], guard=guard)
+    br.facing.step = lambda theta, now, v=0.0, delay_s=None: spy.append((round(theta, 1), delay_s))
+    return br, ext, clock, spy
+_od = [{"A": (12.0, 0.30)}]
+_b1, _e1, _c1, _s1 = _ob_brain(_od)
+_b1.step(0.0)
+check("onboard + external: when our own camera sees the opponent, its bearing (12 deg) replaces the external one (50 deg), with the fresher delay",
+      _s1 == [(12.0, ev.ONBOARD_DELAY_S)], str(_s1))
+_od[0] = {}
+_b2, _e2, _c2, _s2 = _ob_brain(_od)
+_b2.step(0.0)
+check("onboard + external: with no onboard reading the external bearing is used as before", _s2 == [(50.0, None)], str(_s2))
+_od3 = [{"A": (12.0, 0.30)}]
+_b3, _e3, _c3, _s3 = _ob_brain(_od3)
+_b3.step(0.0)                                                              # facing A, remembered
+_e3.threat = ev.Threat()                                                   # the external camera loses the follower: no threat any more
+_c3[0] += 0.5; _s3.clear(); _b3.step(0.0)
+check("onboard carries the facing on when the external camera has lost the follower (it still sees the opponent close, in front)",
+      _s3 == [(12.0, ev.ONBOARD_DELAY_S)], str(_s3))
+_od3[0] = {"A": (12.0, 0.80)}                                              # too far to be a threat
+_c3[0] += 0.5; _s3.clear(); _b3.step(0.0)
+check("... but not if the opponent is far (0.8 m), or after the sustain time", _s3 == [], str(_s3))
+_od3[0] = {"A": (12.0, 0.30)}
+_c3[0] += 5.0; _s3.clear(); _b3.step(0.0)
+check("... or long after the external threat vanished", _s3 == [], str(_s3))
+_pp_ob = _pp.Pipeline(ev.ChaserDetector(4), ev.ExternalWatch(), None, lambda y: None, StopMotors(), None)
+_pp_ob.on_onboard({"B": (5.0, 0.4)}, 100.0)
+check("pipeline: onboard readings are returned while fresh and dropped when stale",
+      _pp_ob.onboard(100.2) == {"B": (5.0, 0.4)} and _pp_ob.onboard(100.0 + ev.ONBOARD_FRESH_S + 0.1) == {})
+import sim_world as _swo
+_rng = np.random.default_rng(0)
+_snap = types.SimpleNamespace(agents={"follower": (0.5, 0.0, 0.0, False), "A": (0.9, 0.1, 0.0, False), "B": (0.2, 0.0, 0.0, False), "C": (0.9, 0.9, 0.0, False)})
+_o = _swo.onboard_bearings(_snap, _rng, bearing_noise_deg=0.0, range_noise=0.0)
+check("sim onboard camera: sees the balloon ahead (A: bearing about +18 deg, left) and not the one behind (B) or outside the field of view (C)",
+      set(_o) == {"A"} and 15 < _o["A"][0] < 22, str(_o))
+
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]
 for r_ in failed:

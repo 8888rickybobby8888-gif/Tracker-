@@ -47,7 +47,7 @@ def apply_measurements():
 
 class Sim:
     def __init__(self, scenario, seed=0, evade_on=True, max_speed=30.0, planning=True, camera_drift=True,
-                 recorder=None, label=None, target="nearest", floor=False):
+                 recorder=None, label=None, target="nearest", floor=False, onboard=None):
         apply_measurements()
         ev.set_max_speed(max_speed)
         self.label = label or scenario["name"]
@@ -69,6 +69,7 @@ class Sim:
         self.last_frame = None
         self.last_state = {}
         self.max_speed = max_speed
+        self.onboard = onboard                            # None, or {"hz", "latency", "loss"}: the follower's own camera feeding the pipeline
         self.evade_on = evade_on
 
         self.motors = sw.SimMotors(self)
@@ -133,6 +134,7 @@ class Sim:
             self.last_state = self.tr.update(self.last_frame, now=t)
             self.pipe.on_state(self.last_state, t)
             self.cam_log.append((self.last_state, sn.agents))             # estimate vs the truth AT THE IMAGE TIME
+        self._onboard_tick(w, t)
         if self.tick_n % (30 // ev.LIDAR_HZ) == 0:                    # the lidar: 30 Hz for 4x4, 15 Hz for 8x8
             sn2 = w.snapshot_at(t - LIDAR_LATENCY)
             tap = self.motors.tap
@@ -148,6 +150,13 @@ class Sim:
                 raise SimEnd("all opponents popped")
         if self.scn.get("until") and self.scn["until"](self):
             raise SimEnd("goal reached")
+
+    def _onboard_tick(self, w, t):
+        """The follower's own camera: one measurement every 30/hz ticks, `latency` old, a whole frame lost with probability `loss`."""
+        ob = self.onboard
+        if not ob or self.tick_n % max(1, round(30 / ob["hz"])) != 0 or self.rng.random() < ob.get("loss", 0.0):
+            return
+        self.pipe.on_onboard(sw.onboard_bearings(w.snapshot_at(t - ob["latency"]), self.rng), t)
 
     def _log(self, t):
         w = self.world

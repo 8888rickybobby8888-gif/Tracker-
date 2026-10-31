@@ -135,6 +135,7 @@ class FastSim(S.Sim):
             self.last_state = self._state_from(sn)
             self.pipe.on_state(self.last_state, t)
             self.cam_log.append((self.last_state, sn.agents))
+        self._onboard_tick(w, t)
         if self.lidar_on and self.tick_n % (30 // ev.LIDAR_HZ) == 0:
             sn2 = w.snapshot_at(t - S.LIDAR_LATENCY)
             tap = self.motors.tap

@@ -435,6 +435,31 @@ def lidar_frame(snap, rng, lidar_back=0.05, own_balloon=True, grid=None):
     return out.ravel()
 
 
+TAPE_WIDTH_M = 0.04              # the tape band outside the inner edge; beyond it the (light) room floor
+
+ONBOARD_FOV_DEG = 65.0           # the follower's own camera: horizontal field of view
+ONBOARD_WIDTH_PX = 320           # QVGA
+ONBOARD_MIN_RANGE_M, ONBOARD_MAX_RANGE_M = 0.10, 2.5
+
+
+def onboard_bearings(snap, rng, bearing_noise_deg=1.0, range_noise=0.10):
+    """What the follower's own camera reports for each opponent balloon it can see: {name: (bearing_deg, range_m)}, bearing relative to the
+    rover's front (+ = left), range from the balloon's apparent size. A balloon is seen when it is within the field of view and the
+    range limits (balloons are high enough to show over a robot's body: an ASSUMPTION about the real mounting)."""
+    x, y, yaw, _ = snap.agents["follower"]
+    out = {}
+    for name, (ax, ay, ayaw, popped) in snap.agents.items():
+        if name == "follower" or popped:
+            continue
+        bx, by = ax - BALLOON_BACK * math.cos(ayaw), ay - BALLOON_BACK * math.sin(ayaw)
+        r = math.hypot(bx - x, by - y)
+        brg = wrap_deg(math.degrees(math.atan2(by - y, bx - x)) - math.degrees(yaw))
+        if abs(brg) > ONBOARD_FOV_DEG / 2.0 or not (ONBOARD_MIN_RANGE_M <= r <= ONBOARD_MAX_RANGE_M):
+            continue
+        out[name] = (brg + rng.normal(0, bearing_noise_deg), max(0.05, r * (1.0 + rng.normal(0, range_noise))))
+    return out
+
+
 def floor_flags(follower):
     """What the three floor colour sensors report: True where a sensor is over the tape band."""
     import floor as floor_mod

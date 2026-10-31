@@ -297,6 +297,18 @@ class Pipeline:
             self.last_plan = p
             self._set(p.yaw_to_waypoint if p else None, p.yaw_to_target if p else None)
 
+    def on_onboard(self, bearings, now):
+        """The follower's OWN camera: {opponent name: (bearing_deg relative to the rover's front, + = left; range_m)} for the balloons it
+        sees right now. `now` is when it arrived. Used by the Brain to keep the facing exact when the external camera can't (marker hidden)."""
+        self._ob = (now, dict(bearings))
+
+    def onboard(self, now):
+        """The latest onboard readings if they are fresh, else {}."""
+        ob = getattr(self, "_ob", None)
+        if ob is None or now - ob[0] > evade.ONBOARD_FRESH_S:
+            return {}
+        return ob[1]
+
     def safe_on_state(self, st, now):
         """on_state for the live run: an error in the vision/planning code must not crash the whole run in the middle of a match.
         The rover stops, the yaw goes to None (nothing to chase) and the next frame tries again."""
