@@ -225,6 +225,8 @@ popped robot is hiding its marker). Speeds beyond the cap are clamped, not an er
 - **ESP-NOW bridge (optional, untested on hardware)**: `lidar_udp.h` with `#define LIDAR_USE_ESPNOW 1` sends each packet by ESP-NOW (broadcast, no router);
   `espnow_bridge/espnow_bridge.ino` on a second ESP32 (USB to the computer) forwards it down the serial line framed as `A5 5A | len | packet | CRC-8`;
   `lidar_rx.SerialLidarReceiver` / `FrameParser` unframe it (resyncing after garbage or a bad CRC); `follow.py --lidar-serial PORT`, `learn_mask.py --serial PORT`.
+  The same line can carry the ESP32's CAMERA for `--onboard bridge`: `cam_espnow.h` cuts each JPEG into 196-byte `CM` packets, `CamAssembler` puts a frame
+  back together (chunks in any order; a frame missing a chunk is dropped), `onboard.JpegFrameSource` decodes it for the onboard tracker.
 - **`lidar_rx.py`**: `LidarReceiver(port, callback)` runs a thread that parses those packets (`make_packet` is the matching encoder
   used by the tests) and calls `callback(values_mm, sensor_time)`; `follow.py` forwards that to `Pipeline.on_lidar` with the rover's own speed.
 - **`learn_mask.py`** (28 lines): with nothing behind the rover, listens 4 s, and any zone reading < 250 mm in ≥ 80% of frames (your own

@@ -137,15 +137,61 @@ class FrameParser:
         return out
 
 
+CAM_HEADER = struct.Struct("<2sHBB")           # b"CM", frame id (uint16), chunk index, chunk count
+CAM_CHUNK_BYTES = 190                          # JPEG bytes per ESP-NOW packet (header 6 + 190 = 196, under the 200 byte frame limit)
+
+
+def make_camera_chunks(frame_id, jpeg):
+    """Split one JPEG into ESP-NOW sized packets (used by the tests and the fake bridge; the real sender is cam_espnow.h)."""
+    jpeg = bytes(jpeg)
+    parts = [jpeg[i:i + CAM_CHUNK_BYTES] for i in range(0, len(jpeg), CAM_CHUNK_BYTES)] or [b""]
+    return [CAM_HEADER.pack(b"CM", frame_id & 0xFFFF, i, len(parts)) + p for i, p in enumerate(parts)]
+
+
+class CamAssembler:
+    """Puts the chunks of one camera frame back together. A frame with a lost chunk is dropped (ESP-NOW broadcast has no retransmit);
+    a chunk of a NEWER frame abandons the unfinished one. Chunks may arrive in any order. Returns the JPEG bytes when complete."""
+
+    def __init__(self):
+        self.frame_id = None
+        self.parts = {}
+        self.count = 0
+        self.dropped = 0                            # frames abandoned incomplete or failing the JPEG check
+
+    def feed(self, payload):
+        if len(payload) < CAM_HEADER.size:
+            return None
+        magic, fid, idx, count = CAM_HEADER.unpack_from(payload)
+        if magic != b"CM" or count == 0 or idx >= count:
+            return None
+        if self.frame_id is None or fid != self.frame_id:
+            if self.parts:
+                self.dropped += 1                    # the old frame never completed
+            self.frame_id, self.parts, self.count = fid, {}, count
+        self.parts[idx] = payload[CAM_HEADER.size:]
+        if len(self.parts) < self.count:
+            return None
+        jpeg = b"".join(self.parts[i] for i in range(self.count))
+        self.parts = {}
+        self.frame_id = None
+        if not (jpeg[:2] == b"\xff\xd8" and jpeg[-2:] == b"\xff\xd9"):      # not a whole JPEG: corrupt, drop it
+            self.dropped += 1
+            return None
+        return jpeg
+
+
 class SerialLidarReceiver:
     """Reads framed lidar packets from a USB serial port in a background thread and calls on_frame(distances, sensor_time_s).
     Same interface as LidarReceiver. `opener(port, baud)` can be replaced (the tests give it a fake port)."""
 
-    def __init__(self, port, on_frame, baud=921600, opener=None):
+    def __init__(self, port, on_frame, baud=921600, opener=None, on_jpeg=None):
         if opener is None:
             import serial                                 # pyserial: pip install pyserial
             opener = lambda p, b: serial.Serial(p, b, timeout=0.1)
         self.on_frame = on_frame
+        self.on_jpeg = on_jpeg                            # optional: the ESP32's camera frames (JPEG bytes) come down the same line
+        self.cam = CamAssembler()
+        self.jpegs = 0
         self.ser = opener(port, baud)
         self.parser = FrameParser()
         self.frames = 0
@@ -169,6 +215,12 @@ class SerialLidarReceiver:
             if not data:
                 continue
             for payload in self.parser.feed(data):
+                if payload[:2] == b"CM":                  # a piece of a camera frame, not a lidar frame
+                    jpeg = self.cam.feed(payload)
+                    if jpeg is not None and self.on_jpeg is not None:
+                        self.jpegs += 1
+                        self.on_jpeg(jpeg)
+                    continue
                 pkt = parse_packet(payload)
                 if pkt is None:
                     self._bad_packets += 1

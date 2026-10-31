@@ -3,6 +3,7 @@ follow.py - runs everything together.
 
     python follow.py --camera 1                           external camera + markers (tracker.py)
     python follow.py --onboard http://<esp32>:81/stream   the follower's own camera (onboard.py)
+    python follow.py --onboard bridge --lidar-serial COM5 the follower's own camera AND lidar through the ESP-NOW bridge (no WiFi)
     add  --lidar-port 4210   (default) for the rear lidar;  --no-lidar to run without evasion
 
 What runs
@@ -85,7 +86,8 @@ def load_mask():
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--onboard", metavar="SOURCE",
-                    help="use the follower's own camera (ESP32 stream URL or index) instead of the external camera")
+                    help="use the follower's own camera (ESP32 stream URL or index, or the word 'bridge' for frames sent through the ESP-NOW "
+                         "bridge: needs --lidar-serial) instead of the external camera")
     ap.add_argument("--camera", type=int)
     ap.add_argument("--flip", action="store_true")
     ap.add_argument("--rover", type=int, default=1, help="rover ID for Bluetooth (default 1)")
@@ -146,17 +148,25 @@ def main(argv=None):
     on_state = lambda st: pipe.safe_on_state(st, time.time())     # called by tracker.py every frame
     brain = pipe.brain
     receiver = None
+    jpeg_src = None
+    if args.onboard == "bridge":                              # the follower's own camera comes through the ESP-NOW bridge, not WiFi
+        if not args.lidar_serial:
+            ap.error("--onboard bridge needs --lidar-serial PORT (the bridge's USB port carries the camera frames too)")
+        import onboard
+        jpeg_src = onboard.JpegFrameSource()
+    on_frame = lambda vals, t: pipe.on_lidar(vals, t, tap.forward_mm_s, tap.rotating, time.time())
     if args.no_lidar:
         print("Running without the rear lidar: " + ("evasion uses the external camera only (blind to a chaser it can't see)."
               if not args.onboard else "WARNING: nothing will evade a chaser (onboard camera mode has no other source)."))
+        if jpeg_src is not None:                              # ... but still read the camera frames from the bridge
+            receiver = lidar_rx.SerialLidarReceiver(args.lidar_serial, lambda vals, t: None, baud=args.lidar_baud, on_jpeg=jpeg_src.push)
+    elif args.lidar_serial:
+        receiver = lidar_rx.SerialLidarReceiver(args.lidar_serial, on_frame, baud=args.lidar_baud,
+                                                on_jpeg=jpeg_src.push if jpeg_src is not None else None)
+        print(f"Listening for lidar{' and camera' if jpeg_src is not None else ''} on {args.lidar_serial} at {args.lidar_baud} baud (ESP-NOW bridge)")
     else:
-        on_frame = lambda vals, t: pipe.on_lidar(vals, t, tap.forward_mm_s, tap.rotating, time.time())
-        if args.lidar_serial:
-            receiver = lidar_rx.SerialLidarReceiver(args.lidar_serial, on_frame, baud=args.lidar_baud)
-            print(f"Listening for lidar on {args.lidar_serial} at {args.lidar_baud} baud (ESP-NOW bridge)")
-        else:
-            receiver = lidar_rx.LidarReceiver(args.lidar_port, on_frame)
-            print(f"Listening for lidar on UDP port {args.lidar_port}")
+        receiver = lidar_rx.LidarReceiver(args.lidar_port, on_frame)
+        print(f"Listening for lidar on UDP port {args.lidar_port}")
 
     def _on_key(key):
         if key in (ord("p"), ord(" ")):                     # PAUSE / RESUME: the rover stands still while paused
@@ -191,7 +201,7 @@ def main(argv=None):
     try:
         if args.onboard:
             import onboard
-            onboard.main(args.onboard, on_yaw=_publish)
+            onboard.main(None if jpeg_src is not None else args.onboard, on_yaw=_publish, cam=jpeg_src)
         else:
             import tracker
             tracker.main(args.camera, True if args.flip else None,

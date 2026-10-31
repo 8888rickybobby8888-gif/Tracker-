@@ -154,6 +154,13 @@ is the receiver:
 It forwards the same lidar packet, framed (`A5 5A`, length, packet, CRC-8), so a lost byte is skipped and the stream resyncs. `GRID` (8x8 vs 4x4) works the same, and the mask is learned with
 `python learn_mask.py --serial COM5`.
 
+**The ESP32's own camera through ESP-NOW too (untested, only for `--onboard` mode).** The bridge's USB line can carry the camera as well:
+include `cam_espnow.h` in the lidar ESP32's sketch (set `PIXFORMAT_JPEG`, `FRAMESIZE_QVGA`, `jpeg_quality 20`; call `camEspnowSend()` about every 100 ms; its
+header lists the steps), then `python follow.py --onboard bridge --lidar-serial COM5`. Each JPEG is cut into 196-byte packets, framed like the lidar,
+and reassembled on the computer; a frame that loses a packet is dropped (broadcast ESP-NOW has no retransmit). Expect roughly 5-10 frames a second at
+QVGA (estimates, not measured): ESP-NOW's default 1 Mbit/s carries about 400-500 such packets a second, the serial line about 90 KB/s. In the normal
+external-camera mode the ESP32's camera is not used at all, so this only matters if you want the follower's-eye view without WiFi.
+
 ### The pop rule (measure these, they set when evasion starts)
 You only lose when an opponent's pin reaches your REAR balloon, so touching isn't a loss. At the top of `evade.py`:
 - `BALLOON_BACK_M` (defence): how far behind your rover's centre your own balloon sits.

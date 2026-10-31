@@ -590,6 +590,36 @@ time.sleep(0.5); _rx.close()
 check("SerialLidarReceiver: reads framed packets from a (fake) USB port and delivers the frames with their sensor times",
       len(_frames) == 5 and _frames[0] == (64, 1.0) and _frames[-1][1] == 1.264 and _rx.bad == 0, f"{len(_frames)} frames {_frames[:1]}...")
 
+# ---- camera frames through the ESP-NOW bridge: chunking, reassembly, loss, mixed with lidar ----
+import cv2 as _cv2
+_img = np.full((120, 160, 3), 90, np.uint8); _cv2.circle(_img, (80, 60), 20, (255, 60, 0), -1)
+_jpg = _cv2.imencode(".jpg", _img)[1].tobytes()
+_chunks = _lx.make_camera_chunks(5, _jpg)
+_asm = _lx.CamAssembler(); _out = None
+for _c in reversed(_chunks): _out = _asm.feed(_c) or _out                     # chunks may arrive in any order
+check("camera over the bridge: a JPEG split into chunks is reassembled byte for byte, even out of order",
+      _out == _jpg and len(_chunks) >= 2 and all(len(c) <= 196 for c in _chunks), f"{len(_jpg)} bytes in {len(_chunks)} chunks")
+_asm2 = _lx.CamAssembler()
+_lost = [c for i, c in enumerate(_chunks) if i != 1]                           # one chunk lost
+_r = [_asm2.feed(c) for c in _lost]
+_r2 = [_asm2.feed(c) for c in _lx.make_camera_chunks(6, _jpg)]                  # the next frame arrives complete
+check("camera over the bridge: a frame with a lost chunk is dropped (counted), and the next whole frame still comes through",
+      all(x is None for x in _r) and _r2[-1] == _jpg and _asm2.dropped == 1, f"dropped={_asm2.dropped}")
+_jp, _lf = [], []
+_mix = b""
+for _i in range(3):
+    _mix += _lx.frame_bytes(_lx.make_packet(_i, 100 * _i, [400.0] * 64))
+    for _c in _lx.make_camera_chunks(_i, _jpg): _mix += _lx.frame_bytes(_c)
+_rx2 = _lx.SerialLidarReceiver("FAKE", lambda v, t: _lf.append(t), opener=lambda p, b: _FakeSerial([_mix[i:i + 61] for i in range(0, len(_mix), 61)]),
+                               on_jpeg=lambda j: _jp.append(j))
+time.sleep(0.5); _rx2.close()
+check("one serial line carries both: 3 lidar frames AND 3 camera frames are delivered, each to its own callback",
+      len(_lf) == 3 and len(_jp) == 3 and all(j == _jpg for j in _jp) and _rx2.bad == 0, f"{len(_lf)} lidar, {len(_jp)} camera, {_rx2.bad} bad")
+import onboard as _ob
+_src = _ob.JpegFrameSource(); _src.push(_jpg)
+_fr, _t = _src.read()
+check("JpegFrameSource: decodes a pushed JPEG into a frame the onboard tracker can read", _fr is not None and _fr.shape == (120, 160, 3) and _t > 0)
+
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]
 for r_ in failed:

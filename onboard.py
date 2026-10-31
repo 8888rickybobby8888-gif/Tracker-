@@ -85,6 +85,35 @@ class LatestFrame:
         self._cap.release()
 
 
+class JpegFrameSource:
+    """A camera whose frames are PUSHED in as JPEG bytes (from the ESP-NOW bridge, lidar_rx.SerialLidarReceiver(on_jpeg=source.push)).
+    Same read()/release() as LatestFrame, so onboard.main can use either."""
+
+    def __init__(self):
+        self.frame, self.t = None, 0.0
+        self.bad = 0
+        self._lock = threading.Lock()
+
+    def push(self, jpeg):
+        f = cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)
+        if f is None:
+            self.bad += 1
+            return
+        if ROTATE_180:
+            f = cv2.rotate(f, cv2.ROTATE_180)
+        if FLIP_HORIZONTAL:
+            f = cv2.flip(f, 1)
+        with self._lock:
+            self.frame, self.t = f, time.time()
+
+    def read(self):
+        with self._lock:
+            return (None, 0.0) if self.frame is None else (self.frame.copy(), self.t)
+
+    def release(self):
+        pass
+
+
 class OnboardTracker:
     def __init__(self, fov_deg=FOV_DEG):
         self.fov_deg = fov_deg
@@ -147,9 +176,10 @@ def draw_overlay(frame, tr, yaw):
                 (10, h - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1, cv2.LINE_AA)
 
 
-def main(source=None, on_yaw=None):
+def main(source=None, on_yaw=None, cam=None):
+    """cam: an already-made camera object (read() -> (frame, time), release()), e.g. a JpegFrameSource fed by the ESP-NOW bridge."""
     src = STREAM_URL if source is None else source
-    cam, tr = LatestFrame(src), OnboardTracker()
+    cam, tr = (cam if cam is not None else LatestFrame(src)), OnboardTracker()
     latest, show_mask = {"f": None}, False
 
     def on_mouse(event, x, y, flags, param):

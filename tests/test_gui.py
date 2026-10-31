@@ -156,6 +156,35 @@ try:
 except Exception as e:
     import traceback; traceback.print_exc(); check("onboard.main", False, repr(e))
 
+# ---------------- 3b. onboard.main fed through the ESP-NOW bridge chain: JPEG -> chunks -> framing -> parser -> reassembly -> JpegFrameSource ----------------
+class BridgeCam:
+    """The same moving balloon as FakeLF, but every frame is sent as the ESP32 would: JPEG, cut into ESP-NOW packets, framed for the USB serial
+    line, parsed, reassembled and pushed into a JpegFrameSource."""
+    def __init__(self):
+        self.src = ob.JpegFrameSource(); self.parser = lx.FrameParser(); self.asm = lx.CamAssembler(); self.n = 0; self.fid = 0; self.t = 0.0
+    def read(self):
+        self.n += 1; self.t += 1/20
+        th = 20.0 if self.n < 40 else -10.0
+        img = np.full((H, W, 3), 90, np.uint8)
+        cx = W/2 - fpx*math.tan(math.radians(th)); cv2.circle(img, (int(round(cx)), 240), 14, (255, 60, 0), -1)
+        jpg = cv2.imencode(".jpg", img)[1].tobytes()
+        wire = b"".join(lx.frame_bytes(c) for c in lx.make_camera_chunks(self.fid, jpg)); self.fid += 1
+        for payload in self.parser.feed(wire):
+            j = self.asm.feed(payload)
+            if j is not None: self.src.push(j)
+        f, _ = self.src.read()
+        return f, self.t
+    def release(self): pass
+got = []
+gui.update(i=0, shown=0, script={3: lambda: click((W/2 - fpx*math.tan(math.radians(20.0)), 240)), 70: 27})
+try:
+    ob.main(None, on_yaw=lambda y: got.append(y), cam=BridgeCam())
+    a = [g for g in got[10:35] if g is not None]; b = [g for g in got[50:] if g is not None]
+    check("onboard.main fed through the whole ESP-NOW bridge chain: yaw to the balloon is still ~+20 then ~-10 degrees (JPEG loss is tiny)",
+          a and b and abs(np.mean(a)-20) < 5 and abs(np.mean(b)+10) < 4, "first %.1f, then %.1f" % (np.mean(a) if a else float('nan'), np.mean(b) if b else float('nan')))
+except Exception as e:
+    import traceback; traceback.print_exc(); check("onboard.main with the bridge camera", False, repr(e))
+
 # ---------------- 4. learn_mask.py over real UDP ----------------
 if os.path.exists("lidar_mask.json"): os.remove("lidar_mask.json")
 proc = subprocess.Popen([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "learn_mask.py")], cwd=os.getcwd(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
