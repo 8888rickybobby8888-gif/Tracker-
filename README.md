@@ -146,6 +146,14 @@ if you ever want to lock it once instead).
 5. With the area behind the rover EMPTY: `python learn_mask.py` (masks your own balloon/stick). 
 6. Tune in the Micromelon simulator before the real rover.
 
+**Option: no WiFi, ESP-NOW through a second ESP32 (untested).** A computer cannot speak ESP-NOW itself, so a second ESP32 plugged in by USB
+is the receiver:
+1. In `lidar_udp.h` uncomment `#define LIDAR_USE_ESPNOW 1` (and don't connect that board to a WiFi network: ESP-NOW needs one channel).
+2. Flash `espnow_bridge/espnow_bridge.ino` to the second ESP32 and plug it into the computer. Keep `ESPNOW_CHANNEL` and `LIDAR_ESPNOW_CHANNEL` equal.
+3. `pip install pyserial`, then `python follow.py --camera 1 --lidar-serial COM5` (your port; `--lidar-baud` if you changed the baud).
+It forwards the same lidar packet, framed (`A5 5A`, length, packet, CRC-8), so a lost byte is skipped and the stream resyncs. `GRID` (8x8 vs 4x4) works the same, and the mask is learned with
+`python learn_mask.py --serial COM5`.
+
 ### The pop rule (measure these, they set when evasion starts)
 You only lose when an opponent's pin reaches your REAR balloon, so touching isn't a loss. At the top of `evade.py`:
 - `BALLOON_BACK_M` (defence): how far behind your rover's centre your own balloon sits.

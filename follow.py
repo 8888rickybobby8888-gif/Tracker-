@@ -90,6 +90,9 @@ def main(argv=None):
     ap.add_argument("--flip", action="store_true")
     ap.add_argument("--rover", type=int, default=1, help="rover ID for Bluetooth (default 1)")
     ap.add_argument("--lidar-port", type=int, default=4210)
+    ap.add_argument("--lidar-serial", metavar="PORT", default=None,
+                    help="get the lidar over USB serial from an ESP-NOW bridge ESP32 (e.g. COM5 or /dev/ttyUSB0) instead of WiFi UDP")
+    ap.add_argument("--lidar-baud", type=int, default=921600, help="baud rate of the bridge (default 921600; must match espnow_bridge.ino)")
     ap.add_argument("--no-lidar", action="store_true", help="run without the rear lidar (no evasion!)")
     ap.add_argument("--max-speed", type=float, default=None,
                     help="global wheel speed cap in cm/s (default: MAX_SPEED_CM_S in evade.py, rover max 30)")
@@ -147,10 +150,13 @@ def main(argv=None):
         print("Running without the rear lidar: " + ("evasion uses the external camera only (blind to a chaser it can't see)."
               if not args.onboard else "WARNING: nothing will evade a chaser (onboard camera mode has no other source)."))
     else:
-        receiver = lidar_rx.LidarReceiver(
-            args.lidar_port,
-            lambda vals, t: pipe.on_lidar(vals, t, tap.forward_mm_s, tap.rotating, time.time()))
-        print(f"Listening for lidar on UDP port {args.lidar_port}")
+        on_frame = lambda vals, t: pipe.on_lidar(vals, t, tap.forward_mm_s, tap.rotating, time.time())
+        if args.lidar_serial:
+            receiver = lidar_rx.SerialLidarReceiver(args.lidar_serial, on_frame, baud=args.lidar_baud)
+            print(f"Listening for lidar on {args.lidar_serial} at {args.lidar_baud} baud (ESP-NOW bridge)")
+        else:
+            receiver = lidar_rx.LidarReceiver(args.lidar_port, on_frame)
+            print(f"Listening for lidar on UDP port {args.lidar_port}")
 
     def _on_key(key):
         if key in (ord("p"), ord(" ")):                     # PAUSE / RESUME: the rover stands still while paused

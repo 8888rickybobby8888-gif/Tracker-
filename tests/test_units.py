@@ -566,6 +566,30 @@ _st = _dm.update(np.full(16, 300.0), 0.0, wall=0.0)                  # a 4x4 fra
 check("lidar frame of the wrong size: ignored (no exception), no threat, detector stays not-alive, mismatch recorded",
       not _st.active and _dm.mismatch == 16 and not _dm.lidar_alive(0.0), f"mismatch={_dm.mismatch}")
 
+# ---- ESP-NOW bridge over USB serial: framing, resync, and the receiver thread ----
+import lidar_rx as _lx
+_pk = _lx.make_packet(7, 1234, [100 + i for i in range(64)])
+_fr = _lx.frame_bytes(_pk)
+_stream = b"\x00\xA5\x13" + _fr + bytes([0xA5]) + _lx.frame_bytes(_pk)[:-1] + b"\x00" + _fr + b"junk" + _fr
+_ps = _lx.FrameParser(); _got = []
+for _i in range(0, len(_stream), 7):                                         # arbitrary 7-byte chunks
+    _got += _ps.feed(_stream[_i:_i + 7])
+check("serial framing: 3 good frames survive garbage, a corrupted frame and 7-byte chunking; the bad one is dropped and counted",
+      len(_got) == 3 and all(g == _pk for g in _got) and _ps.bad == 1, f"{len(_got)} frames, {_ps.bad} bad")
+check("serial framing: CRC-8 (poly 0x07) matches the standard check value", _lx.crc8(b"123456789") == 0xF4)
+class _FakeSerial:
+    def __init__(self, chunks): self.chunks = list(chunks); self.closed = False
+    def read(self, n):
+        if self.chunks: return self.chunks.pop(0)
+        time.sleep(0.01); return b""
+    def close(self): self.closed = True
+_frames = []
+_all = b"".join(_lx.frame_bytes(_lx.make_packet(i, 1000 + 66 * i, [500.0] * 16 + [float("nan")] * 48)) for i in range(5))
+_rx = _lx.SerialLidarReceiver("FAKE", lambda v, t: _frames.append((len(v), round(t, 3))), opener=lambda p, b: _FakeSerial([_all[i:i + 50] for i in range(0, len(_all), 50)]))
+time.sleep(0.5); _rx.close()
+check("SerialLidarReceiver: reads framed packets from a (fake) USB port and delivers the frames with their sensor times",
+      len(_frames) == 5 and _frames[0] == (64, 1.0) and _frames[-1][1] == 1.264 and _rx.bad == 0, f"{len(_frames)} frames {_frames[:1]}...")
+
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]
 for r_ in failed:

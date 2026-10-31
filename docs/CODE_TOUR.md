@@ -222,7 +222,10 @@ popped robot is hiding its marker). Speeds beyond the cap are clamped, not an er
 - **`lidar_udp.h` / `lidar_test/lidar_test.ino`** (ESP32, **never compiled on real hardware**): read the VL53L7CX with the SparkFun library and
   broadcast UDP packets on port 4210: `'L' 'D'`, sequence (uint16), zone count (1 byte), sensor time (uint32 ms), then `zones × uint16` distances
   (0xFFFF = none), little-endian. `lidar_test.ino` is the bring-up sketch (wiring in its header).
-- **`lidar_rx.py`** (78 lines): `LidarReceiver(port, callback)` runs a thread that parses those packets (`make_packet` is the matching encoder
+- **ESP-NOW bridge (optional, untested on hardware)**: `lidar_udp.h` with `#define LIDAR_USE_ESPNOW 1` sends each packet by ESP-NOW (broadcast, no router);
+  `espnow_bridge/espnow_bridge.ino` on a second ESP32 (USB to the computer) forwards it down the serial line framed as `A5 5A | len | packet | CRC-8`;
+  `lidar_rx.SerialLidarReceiver` / `FrameParser` unframe it (resyncing after garbage or a bad CRC); `follow.py --lidar-serial PORT`, `learn_mask.py --serial PORT`.
+- **`lidar_rx.py`**: `LidarReceiver(port, callback)` runs a thread that parses those packets (`make_packet` is the matching encoder
   used by the tests) and calls `callback(values_mm, sensor_time)`; `follow.py` forwards that to `Pipeline.on_lidar` with the rover's own speed.
 - **`learn_mask.py`** (28 lines): with nothing behind the rover, listens 4 s, and any zone reading < 250 mm in ≥ 80% of frames (your own
   balloon and stick) is masked; saves `lidar_mask.json` (4×4 of 0/1). `ChaserDetector` excludes masked zones from both detection and the

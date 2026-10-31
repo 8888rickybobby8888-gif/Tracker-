@@ -95,6 +95,29 @@ check("lidar over UDP: a chaser behind-left makes the rover turn LEFT to face it
 check("shutdown: motors set to 0, rover stopped and disconnected, in that order",
       [e[0] for e in ev4 if e[0] in ("stop", "end")] == ["stop", "end"] and ("write", 0, 0) in ev4)
 
+
+# 4b. the same chaser, but the lidar arrives over the ESP-NOW bridge (USB serial) with --lidar-serial
+class FakeBridgePort:
+    """What the bridge ESP32 would send down USB: one framed lidar packet every 1/30 s, from the same chaser as the UDP test."""
+    def __init__(self): self.t0 = time.time(); self.sent = 0; self.seq = 0
+    def read(self, n):
+        due = int((time.time() - self.t0) * 30)
+        if self.sent >= due:
+            time.sleep(0.01); return b""
+        out = b""
+        while self.sent < due:
+            tt = self.sent / 30.0
+            out += lidar_rx.frame_bytes(lidar_rx.make_packet(self.seq, int(tt * 1000), esp32_chaser(tt).ravel())); self.sent += 1; self.seq += 1
+        return out
+    def close(self): pass
+_orig_serial_rx = lidar_rx.SerialLidarReceiver
+lidar_rx.SerialLidarReceiver = lambda port, cb, baud=921600: _orig_serial_rx(port, cb, baud=baud, opener=lambda p, b: FakeBridgePort())
+ev4b, ch, _ = run_follow(["--camera", "0", "--lidar-serial", "FAKE"], states_fn=lambda t: {"follower": {"x": 0.3, "y": 0.2, "yaw": 0.0, "age": 0}}, secs=3.5)
+lidar_rx.SerialLidarReceiver = _orig_serial_rx
+turns = [e for e in ev4b if e[0] == "evade-turn"]
+check("lidar over the ESP-NOW bridge (--lidar-serial): a chaser behind-left makes the rover turn LEFT to face it",
+      turns and 120 < turns[0][1] <= 180, f"{turns[0][1:]}" if turns else "no evasion")
+
 # 5. external camera only: side attack
 def side_attack(t):
     y = max(0.22, 1.0 - 0.3 * max(0.0, t - 0.6))

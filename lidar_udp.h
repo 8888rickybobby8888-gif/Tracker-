@@ -25,6 +25,17 @@
 #include <WiFiUdp.h>
 #include <SparkFun_VL53L5CX_Library.h>
 
+// ---- ESP-NOW instead of WiFi UDP (UNTESTED) -------------------------------------------------------------------------
+// Uncomment to send each lidar packet by ESP-NOW (peer-to-peer, no router) to a SECOND ESP32 that is plugged into the computer by USB
+// and runs espnow_bridge/espnow_bridge.ino; then start follow.py with  --lidar-serial <port>.  Do NOT also connect this board to a
+// WiFi network (ESP-NOW and a WiFi connection must share one channel): in external-camera mode the camera stream is not needed.
+// #define LIDAR_USE_ESPNOW 1
+#define LIDAR_ESPNOW_CHANNEL 1  // must match ESPNOW_CHANNEL in espnow_bridge.ino
+#ifdef LIDAR_USE_ESPNOW
+#include <esp_now.h>
+#include <esp_wifi.h>
+#endif
+
 #define LIDAR_SDA 13            // CHANGE to free pins on your board
 #define LIDAR_SCL 32
 #define LIDAR_UDP_PORT 4210     // must match --lidar-port in follow.py
@@ -38,6 +49,20 @@ static uint16_t lidarSeq = 0;
 static bool lidarOk = false;
 
 inline void lidarBegin() {
+#ifdef LIDAR_USE_ESPNOW
+  WiFi.mode(WIFI_STA);
+  esp_wifi_set_channel(LIDAR_ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("ESP-NOW: init FAILED");
+  } else {
+    esp_now_peer_info_t peer = {};
+    memset(peer.peer_addr, 0xFF, 6);                  // broadcast: no need to know the bridge's MAC address
+    peer.channel = LIDAR_ESPNOW_CHANNEL;
+    peer.encrypt = false;
+    if (esp_now_add_peer(&peer) != ESP_OK) Serial.println("ESP-NOW: add broadcast peer FAILED");
+    else Serial.println("ESP-NOW: sending lidar by broadcast on channel " + String(LIDAR_ESPNOW_CHANNEL));
+  }
+#endif
   Wire.begin(LIDAR_SDA, LIDAR_SCL);
   Wire.setClock(400000);
   Serial.println("Lidar: starting (firmware upload can take a few seconds)...");
@@ -72,7 +97,12 @@ inline void lidarPoll() {
     if ((st == 5 || st == 9) && lidarData.distance_mm[i] > 0) d = (uint16_t)lidarData.distance_mm[i];
     memcpy(buf + 9 + 2 * i, &d, 2);
   }
+#ifdef LIDAR_USE_ESPNOW
+  static const uint8_t bcast[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  esp_now_send(bcast, buf, 9 + 2 * n);               // one packet = one lidar frame (137 bytes for 8x8, under the 250 byte limit)
+#else
   lidarUdp.beginPacket(WiFi.broadcastIP(), LIDAR_UDP_PORT);
   lidarUdp.write(buf, 9 + 2 * n);
   lidarUdp.endPacket();
+#endif
 }

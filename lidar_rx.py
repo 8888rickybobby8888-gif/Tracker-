@@ -1,5 +1,6 @@
 """
-lidar_rx.py - receives the rear-lidar frames the ESP32 sends over UDP.
+lidar_rx.py - receives the rear-lidar frames the ESP32 sends: over WiFi UDP (LidarReceiver) or over USB serial from an ESP-NOW bridge
+(SerialLidarReceiver, see espnow_bridge/espnow_bridge.ino).
 
 Packet (little-endian), matching lidar_udp.h:
     2 bytes  b"LD"
@@ -76,3 +77,110 @@ class LidarReceiver:
     def close(self):
         self._stop = True
         self.sock.close()
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# ESP-NOW bridge over USB serial. A computer cannot speak ESP-NOW itself, so a SECOND ESP32 (plugged into the computer by USB)
+# receives the lidar ESP32's ESP-NOW packets and forwards each one down the serial line, framed so a lost byte can be resynced:
+#     0xA5 0x5A | length (1 byte) | the same "LD" packet as above | CRC-8 of that packet (poly 0x07)
+SYNC = b"\xA5\x5A"
+
+
+def crc8(data):
+    crc = 0
+    for b in data:
+        crc ^= b
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x07) & 0xFF if crc & 0x80 else (crc << 1) & 0xFF
+    return crc
+
+
+def frame_bytes(payload):
+    """Frame one "LD" packet for the serial line (used by the tests and the fake bridge; the real one is the ESP32 sketch)."""
+    payload = bytes(payload)
+    return SYNC + bytes([len(payload)]) + payload + bytes([crc8(payload)])
+
+
+class FrameParser:
+    """Feed it whatever bytes arrive (any chunking, with garbage or lost bytes in between); it returns each complete, CRC-correct payload."""
+
+    def __init__(self):
+        self.buf = bytearray()
+        self.bad = 0                                  # frames dropped for a bad length or CRC
+
+    def feed(self, data):
+        self.buf += data
+        out = []
+        while True:
+            i = self.buf.find(SYNC)
+            if i < 0:
+                del self.buf[:max(0, len(self.buf) - 1)]            # keep a possible half sync byte
+                break
+            if i > 0:
+                del self.buf[:i]
+            if len(self.buf) < 3:
+                break
+            n = self.buf[2]
+            if n == 0 or n > 200:                       # not a plausible length: this was not a frame start
+                del self.buf[:1]
+                self.bad += 1
+                continue
+            if len(self.buf) < 3 + n + 1:
+                break                                   # wait for the rest
+            payload = bytes(self.buf[3:3 + n])
+            if crc8(payload) == self.buf[3 + n]:
+                out.append(payload)
+                del self.buf[:3 + n + 1]
+            else:
+                del self.buf[:1]                         # bad CRC: skip this sync byte and look for the next frame
+                self.bad += 1
+        return out
+
+
+class SerialLidarReceiver:
+    """Reads framed lidar packets from a USB serial port in a background thread and calls on_frame(distances, sensor_time_s).
+    Same interface as LidarReceiver. `opener(port, baud)` can be replaced (the tests give it a fake port)."""
+
+    def __init__(self, port, on_frame, baud=921600, opener=None):
+        if opener is None:
+            import serial                                 # pyserial: pip install pyserial
+            opener = lambda p, b: serial.Serial(p, b, timeout=0.1)
+        self.on_frame = on_frame
+        self.ser = opener(port, baud)
+        self.parser = FrameParser()
+        self.frames = 0
+        self._bad_packets = 0
+        self.last_rx = None
+        self._stop = False
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    @property
+    def bad(self):
+        """Frames dropped for a bad length or CRC, plus framed packets that were not a lidar packet."""
+        return self.parser.bad + self._bad_packets
+
+    def _run(self):
+        while not self._stop:
+            try:
+                data = self.ser.read(256)
+            except Exception:
+                break
+            if not data:
+                continue
+            for payload in self.parser.feed(data):
+                pkt = parse_packet(payload)
+                if pkt is None:
+                    self._bad_packets += 1
+                    continue
+                _, ms, vals = pkt
+                self.frames += 1
+                self.last_rx = time.time()
+                self.on_frame(vals, ms / 1000.0)
+
+    def close(self):
+        self._stop = True
+        try:
+            self.ser.close()
+        except Exception:
+            pass
