@@ -67,6 +67,15 @@ So against ONE hunter the follower wins roughly 70-85% of the fights (it depends
 to the fight itself traded survival for something else. What would be left is a different kind of idea (not committing to the nearest
 opponent for the first second, or using the opponent's heading when it is known), not tuning.
 
+### Seed 13 re-run with the current code (line-first + tandem), full render, `hunter`, 60 s
+| Setup | Result |
+|---|---|
+| default (external camera only) | no pops either way, 0 tape / 0 no-go frames, **time-out** (no longer shoved out and popped: line-first escape fixed that part) |
+| `calm_first`, `kite`, `active_first` | same: time-out, 0 violations |
+| tandem, good link (15 Hz, 0.12 s) | **win**: popped B at 15.3 s and A at 21.5 s, 0 violations |
+| tandem, ESP-NOW-like link (8 Hz, 33% frames lost) | time-out, 0 violations |
+One seed only: it shows what changed for this seed, not a rate.
+
 ## Making the keep-out zone round the no-go diamond smaller
 Asked for: "a little smaller". The keep-out is the robot radius (0.08) plus `NOGO_MARGIN_M`.
 | `NOGO_MARGIN_M` (fixed) | Survived | Won | Violation-free runs |
