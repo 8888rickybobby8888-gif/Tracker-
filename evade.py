@@ -118,6 +118,8 @@ BACKOFF_M = 0.35          # start backing off when its balloon is this close (to
 BACKOFF_RELEASE_M = 0.55  # ... and keep going until the gap is this big, then let the normal chase run (it can't catch us)
 BACKOFF_CLEAR_M = 0.50    # only if there is this much free floor behind us (inside the tape, outside the no-go zone)
 HOLD_SPEED = 0            # cm/s of push at full depth (an opponent shoves at about 10 cm/s)
+ESCAPE_IN_CONTACT = False # True = THE LINE COMES FIRST: the boundary escape also runs while an opponent is on us (it then drives away from
+                          # the line even if that means pushing into the opponent or turning our back to it)
 ESCAPE_NUDGE = False      # True = while facing an opponent near an edge, also move forward/back away from it.
                           # Tested: it drops survival against a hunter from 12/12 to 5/12, so it stays off.
 ESCAPE_REVERSE_ONLY = False  # with ESCAPE_NUDGE: only back away from an edge (never drive TOWARD the opponent we are facing)
@@ -933,7 +935,7 @@ class Brain:
                       and bool(threat.who))
         hunter_near = (esc is not None and self.external is not None
                        and self.external.any_active_within(CLOSE_RING_M + 0.15, now))
-        if ESCAPE_DRIVE and esc is not None and not facing_now and not hunter_near:   # BOUNDARY ESCAPE: nothing to keep facing: get clear
+        if ESCAPE_DRIVE and esc is not None and (ESCAPE_IN_CONTACT or (not facing_now and not hunter_near)):   # BOUNDARY ESCAPE: get clear of the line
             if self.facing is not None and self.facing.active:
                 self.facing.stop()
             self._drive_away(esc)
