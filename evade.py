@@ -95,9 +95,9 @@ HARD_RING_M = 0.30        # ... but NEVER inside this distance (its balloon to y
                           # you are moving, and a chase that swings your back toward it is exactly what it is waiting for
 RING_AWAY_COS = 0.5       # ... or it is clearly moving AWAY from you (cos of the angle between its velocity and the line
                           # from you to it): a target you are chasing is not a threat
-ESCAPE_NOGO_M = 0.09      # BOUNDARY ESCAPE: if the centre of the rover gets this close to the no-go zone (shoved by an opponent,
+ESCAPE_NOGO_M = 0.13      # BOUNDARY ESCAPE: if the centre of the rover gets this close to the no-go zone (shoved by an opponent,
                           # or just drifting), stop whatever else it is doing and drive away from it. Top priority.
-ESCAPE_TAPE_M = 0.08      # ... the same for the tape boundary (distance from the centre to the inside edge of the tape)
+ESCAPE_TAPE_M = 0.12      # ... the same for the tape boundary (distance from the centre to the inside edge of the tape)
 POSE_LAG_S = 0.2          # age of the camera's pose of the follower (image + processing): the boundary check looks this far ahead
 ESCAPE_RELEASE_M = 0.03   # it keeps escaping until it is this much further clear (no flip-flopping at the edge)
 ESCAPE_DRIVE = True       # when no opponent is close, drive away from the no-go zone / tape edge (no longer fights the defence)
@@ -118,12 +118,12 @@ BACKOFF_M = 0.35          # start backing off when its balloon is this close (to
 BACKOFF_RELEASE_M = 0.55  # ... and keep going until the gap is this big, then let the normal chase run (it can't catch us)
 BACKOFF_CLEAR_M = 0.50    # only if there is this much free floor behind us (inside the tape, outside the no-go zone)
 HOLD_SPEED = 0            # cm/s of push at full depth (an opponent shoves at about 10 cm/s)
-ESCAPE_IN_CONTACT = False # True = THE LINE COMES FIRST: the boundary escape also runs while an opponent is on us (it then drives away from
+ESCAPE_IN_CONTACT = True  # True = THE LINE COMES FIRST: the boundary escape also runs while an opponent is on us (it then drives away from
                           # the line even if that means pushing into the opponent or turning our back to it)
 ESCAPE_NUDGE = False      # True = while facing an opponent near an edge, also move forward/back away from it.
                           # Tested: it drops survival against a hunter from 12/12 to 5/12, so it stays off.
 ESCAPE_REVERSE_ONLY = False  # with ESCAPE_NUDGE: only back away from an edge (never drive TOWARD the opponent we are facing)
-ESCAPE_SPEED = 20         # cm/s used for the escape drive (and for the forward/back nudge while facing an opponent)
+ESCAPE_SPEED = 28         # cm/s used for the escape drive (and for the forward/back nudge while facing an opponent)
 TRACK_FACING = True       # while defending, keep FACING the opponent with continuous wheel commands (not discrete turns)
 TRACK_KP = 1.8            # turn rate (deg/s) per degree of bearing error
 TRACK_DELAY_S = 0.25      # camera + processing delay: the bearing it sees is this old, so it is carried forward by our own

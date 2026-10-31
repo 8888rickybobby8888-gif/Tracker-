@@ -170,6 +170,9 @@ instead FACED continuously (`FacingTracker`): smooth wheel commands keep your fr
 - The camera loses your marker about a quarter of the time with an opponent beside you: your position and heading are then carried on
   from the wheel commands (up to 1.5 s, 5 s with an opponent beside you; `pipeline.py`), the heading is checked against the wheels
   when the marker comes back, and with no pose at all the rover stands still rather than search.
+- **The line comes first** (`ESCAPE_IN_CONTACT = True`): whenever the rover gets within `ESCAPE_TAPE_M` (0.12 m) of the tape or `ESCAPE_NOGO_M`
+  (0.13 m) of the no-go zone, it drives away from the line even with an opponent on it. That cut violations a lot and cost survival against
+  hunters (numbers in `docs/EXPERIMENTS.md`); set `ESCAPE_IN_CONTACT = False` to fight on instead.
 - Off by default and left in the code, because they lost more than they won in simulation (`docs/EXPERIMENTS.md`): `BACKOFF_SPEED`,
   `SIDESTEP_SPEED`, `HOLD_SPEED`, and `plan.AVOID_R_M`.
 

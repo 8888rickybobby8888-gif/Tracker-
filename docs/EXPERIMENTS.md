@@ -81,3 +81,21 @@ no-go frames). A fixed smaller zone is therefore NOT acceptable.
 What was kept: a TWO-SIZE zone. While any opponent is moving (or was in the last 3 s) the full 0.13 margin is used; while nothing moves, `NOGO_MARGIN_CALM_M`
 = 0.09 (0.54 m across instead of 0.62 m, 12% smaller). Same sweep, 12 seeds: 163/228 violation-free vs 168/228 for the fixed 0.13 (inside the noise),
 calm scenarios unchanged. The shoves only happen when something is moving, so the smaller zone costs nothing there.
+
+## Line first: never cross the tape or enter the no-go zone, even when it costs a fight
+Asked for: "don't go over the line, that's what matters". The boundary escape used to be OFF while an opponent was on us. Now
+`ESCAPE_IN_CONTACT = True`: the escape (drive away from the line) also runs in contact, and starts earlier (`ESCAPE_TAPE_M` 0.12, `ESCAPE_NOGO_M`
+0.13 instead of 0.08 / 0.09) and faster (`ESCAPE_SPEED` 28). Fast sim, 12 seeds x 19 cases (228 runs):
+
+| Setting | Violation-free runs | Survived | Won | `hunter` scenario, tape frames (avg) |
+|---|---|---|---|---|
+| before (escape off in contact) | 163 | 191 | 154 | 280 |
+| escape in contact, old margins | 163 | 151 | 127 | 54 |
+| + margins 0.10 / 0.11 | 179 | 142 | 99 | 16 |
+| **+ margins 0.12 / 0.13, speed 28 (now the default)** | **200** | **126** | **93** | **2** |
+| + margins 0.15 / 0.16 | 216 | 99 | 59 | 2 |
+
+It is a straight trade: the earlier and harder the rover leaves a fight to get clear of the line, the fewer violations and the more often it is popped
+(it turns away from the opponent, or pushes into it, and its balloon is exposed). The non-hunter scenarios only gain (`chase_around` 26 -> 0 tape frames,
+`three_calm` 82 -> 22, same wins). The cost is entirely in fights against hunters (`hunter` scenario: 9 of 12 survived -> 4 of 12). To change the balance,
+edit `ESCAPE_TAPE_M` / `ESCAPE_NOGO_M` / `ESCAPE_IN_CONTACT` at the top of `evade.py`.

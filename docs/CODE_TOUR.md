@@ -199,8 +199,8 @@ the Python-level `Motors.write` so an out-of-range speed is clamped instead of r
 2. **no camera frame for 0.8 s** (`NO_CAMERA_STOP_S`) → stop; resumes by itself.
 3. **floor-sensor tape guard** (opt-in): tape under a sensor while driving forward → reverse 0.5 s.
 4. Read the threat: the lidar's, vetoed if it is really a parked/popped body; fused with the camera's (the camera wins: it has the exact angle).
-5. **Boundary escape**: near the tape or no-go zone and no opponent close → drive away (it is deliberately off while a hunter is close, because
-   fighting it from an edge was safer than turning your back).
+5. **Boundary escape (the line comes first)**: within `ESCAPE_TAPE_M` (0.12) of the tape or `ESCAPE_NOGO_M` (0.13) of the no-go zone → drive away from
+   it at `ESCAPE_SPEED` 28, even with an opponent on us (`ESCAPE_IN_CONTACT`). This costs survival against hunters but nearly removes line crossings.
 6. **Defend**: a camera threat with a name → `FacingTracker`; a lidar-only threat → the quick turn (with cooldown).
 7. **All opponents popped** (or the last one just vanished beside us) → stand still.
 8. **No pose with an opponent beside us** → stand still (don't search blindly).
