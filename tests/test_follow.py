@@ -111,7 +111,7 @@ class FakeBridgePort:
         return out
     def close(self): pass
 _orig_serial_rx = lidar_rx.SerialLidarReceiver
-lidar_rx.SerialLidarReceiver = lambda port, cb, baud=921600: _orig_serial_rx(port, cb, baud=baud, opener=lambda p, b: FakeBridgePort())
+lidar_rx.SerialLidarReceiver = lambda port, cb, baud=921600, on_jpeg=None: _orig_serial_rx(port, cb, baud=baud, opener=lambda p, b: FakeBridgePort(), on_jpeg=on_jpeg)
 ev4b, ch, _ = run_follow(["--camera", "0", "--lidar-serial", "FAKE"], states_fn=lambda t: {"follower": {"x": 0.3, "y": 0.2, "yaw": 0.0, "age": 0}}, secs=3.5)
 lidar_rx.SerialLidarReceiver = _orig_serial_rx
 turns = [e for e in ev4b if e[0] == "evade-turn"]
