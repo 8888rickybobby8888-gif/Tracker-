@@ -82,6 +82,11 @@ full-render scenarios); `python simulate.py hunter` (video in `sim_output/`).
   targeting study was re-run after the fix and NO method beat another (docs/EXPERIMENTS.md); results quoted elsewhere that were produced before
   the fix (the 16-seed full-render `hunter` numbers in section 6) may shift and need re-measuring.
 
+## 5b. Tandem mode (external + onboard camera)
+`follow.py --camera N --onboard SRC|bridge`. `onboard.MultiTracker` (bearing+range per slot) -> `OnboardFeed` thread -> `Pipeline.on_onboard` -> `evade.Brain`
+(onboard bearing replaces the external `turn_deg` for the threat; carries the facing for <=2 s when the external camera lost us). Fast sim, hunter:
+survived 122/180 vs 78/180 without. WiFi vs ESP-NOW: `docs/WIFI_VS_ESPNOW.md` (user has exactly 2 ESP32s: rover + bridge). Hardware-untested.
+
 ## 6. Results (simulation)
 Full renderer, `hunter` scenario, 16 seeds (older code, before the fixation fix): about 11-14 wins, 2-3 pops, 0-2 time-outs; zero violations in
 most runs. `chase_around`, `start_beside_nogo`, `wanderer`: clean. `three_calm`: all popped, 0-24 tape frames. Details and every experiment:

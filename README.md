@@ -237,6 +237,17 @@ point behind the target (where your pin meets its balloon). Close to that point 
   are clamped, not an error.
 - If the opponent is hardly moving its heading is unknown, so it aims at the opponent itself (the front, possibly).
 
+## Tandem: external camera + the follower's own camera (untested on hardware)
+```
+python follow.py --camera 1 --onboard http://<esp32>:81/stream
+python follow.py --camera 1 --onboard bridge --lidar-serial COM5      # camera + lidar over ESP-NOW (2 ESP32s: rover + bridge)
+```
+The external camera stays primary (positions, planning). The follower's own camera measures bearing and range of each balloon (same
+A/B/C colours as `tracker.OPPONENT_HSV`) and, when it sees the threatening opponent, its bearing replaces the external one (fresher, exact, not
+affected by a hidden marker); if the external camera loses us it carries the facing on for up to 2 s while the opponent is close and in front.
+If the onboard camera stops, the watchdog warns and the defence is the external-only one. In the fast simulator survival roughly doubled
+(see `docs/WIFI_VS_ESPNOW.md`, which also compares WiFi with ESP-NOW for the lidar and the camera).
+
 ## Follower with its own camera (ESP32-CAM): onboard.py
 If the camera is on the follower, use `onboard.py` instead of `tracker.py`: no markers, floor marker
 or external camera. The balloon's left/right position in the image IS the yaw to the leader.

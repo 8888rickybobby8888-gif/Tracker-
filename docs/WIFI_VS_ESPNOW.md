@@ -54,10 +54,29 @@ What has to travel from the follower's ESP32 to the computer:
 ## 4. Does the link quality change the fight? (fast simulator)
 
 `tests/fastsim.py` models the onboard camera as bearing + range of each opponent balloon in view (+-1 degree, +-10% range), delivered with a
-frame rate, a latency and a loss rate. The follower fights one hunter, 12 seeds per row (hunter scenario). "Survived" = own balloon not
+frame rate, a latency and a loss rate. The follower fights one hunter. "Survived" = own balloon not
 popped, "won" = popped the opponent first, "tape/no-go" = frames over the limits.
 
-RESULTS_TABLE
+Hunter scenario, 24 seeds per row (fast simulator, same code; only the onboard link differs):
+
+| Onboard camera link | fps | latency | frames lost | survived | won | zero-violation runs |
+|---|---|---|---|---|---|---|
+| none (external camera only) | - | - | - | 11/24 | 7/24 | 20/24 |
+| ideal | 15 | 0.12 s | 0% | **21/24** | **15/24** | 19/24 |
+| WiFi-like | 15 | 0.15 s | 5% | 17/24 | 8/24 | 23/24 |
+| ESP-NOW-like, 1% packet loss | 8 | 0.10 s | 33% | 10/24 | 7/24 | 18/24 |
+| ESP-NOW-like, 5% packet loss | 8 | 0.10 s | 87% | 15/24 | 7/24 | 18/24 |
+| congested WiFi | 6 | 0.30 s | 20% | 15/24 | 11/24 | 20/24 |
+
+A larger 12-seed sweep over all hunter variants (15 Hz, 0.12 s, no loss) gave survived 122/180 vs 78/180 and won 72/180 vs 45/180 without the onboard camera.
+
+**Reading it honestly:** with 24 seeds one row has roughly +-10 percentage points of noise, so the rows below "ideal" cannot be told apart from each
+other (the 5%-loss ESP-NOW row beating the 1%-loss one is noise). What the data does support: (1) a good onboard camera clearly helps (about
+2x survival over external-only, in both sweeps); (2) the benefit shrinks as fps drops and frames are lost, and a poor link is roughly
+the external-only result, not worse; (3) no link profile hurt the line behaviour (tape/no-go frames are not worse). So the choice of link
+matters mainly through fps and lost frames, which is why the recommendation is whichever link you can make deliver >= 10 fps with little
+loss in your venue.
+
 
 Read it as a guide to *relative* sensitivity, not as hardware numbers: the simulator's marker-hiding and heading-error models are
 calibrated against the full renderer, but the onboard camera's field of view, its mounting height above the other robot's body and the
