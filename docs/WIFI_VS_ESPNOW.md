@@ -10,6 +10,12 @@ What has to travel from the follower's ESP32 to the computer:
 | Rear lidar, 8x8 | 64 distances, ~140 B | 15 Hz |
 | Onboard camera (QVGA JPEG, ~6-10 KB) | 30-50 chunks of <=190 B | 10-15 fps |
 
+## 0. You have two ESP32s: what that means
+- **ESP-NOW uses both:** #1 on the rover (camera + lidar on the SAME board, as `cam_espnow.h` / `lidar_udp.h` are written) and #2 as the
+  bridge on the computer's USB. Nothing is left over, so the lidar and the camera must share the one rover board (and its one radio).
+- **WiFi uses one:** the rover board only; the second ESP32 stays spare (or can be a second lidar/camera board if you want one).
+- You cannot give the camera and the lidar their own ESP-NOW boards with only two; that would need three (two senders + one bridge).
+
 ## 1. The two options as built here
 
 - **WiFi (default).** The rover-side ESP32 joins the computer's network. Lidar goes as UDP (`lidar_udp.h` -> `lidar_rx.LidarReceiver`),
