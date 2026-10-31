@@ -41,7 +41,14 @@ What has to travel from the follower's ESP32 to the computer:
 | Camera + lidar together | Two independent flows | Share one radio: camera chunks can delay a lidar packet; send lidar first / cap camera fps |
 | Works with the ESP32 also being the lidar host | Yes | Yes (both in `lidar_udp.h` by a `#define`) |
 
-## 3. Recommendation
+## 3. Decision: WiFi (ESP-NOW stays an optional extra)
+The user's choice: **use WiFi**; ESP-NOW was only a concept. With WiFi the second ESP32 isn't needed, and the simulator's best case
+(15 fps, ~0.12 s) is what WiFi normally delivers. Setup: put the rover ESP32 on a hotspot (the computer's, or a phone's) that nothing
+else uses, then `python follow.py --camera 1 --onboard http://<esp32-ip>:81/stream` (lidar UDP arrives on port 4210 as before).
+Watch for `WARNING: no onboard camera data`; if it keeps appearing, move the hotspot's channel or drop `--onboard`.
+The rest of this section is the original reasoning, kept for reference.
+
+## 3b. Original recommendation
 
 - **Lidar: ESP-NOW.** One small packet at 15 Hz, steady low latency, no router, a lost frame costs nothing. This is the clear win.
 - **Onboard camera: depends on the venue.**
