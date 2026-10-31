@@ -133,9 +133,10 @@ class Sim:
             self.last_state = self.tr.update(self.last_frame, now=t)
             self.pipe.on_state(self.last_state, t)
             self.cam_log.append((self.last_state, sn.agents))             # estimate vs the truth AT THE IMAGE TIME
-        sn2 = w.snapshot_at(t - LIDAR_LATENCY)                        # lidar at 30 Hz
-        tap = self.motors.tap
-        self.pipe.on_lidar(sw.lidar_frame(sn2, self.rng), sn2.t, tap.forward_mm_s, tap.rotating, t)
+        if self.tick_n % (30 // ev.LIDAR_HZ) == 0:                    # the lidar: 30 Hz for 4x4, 15 Hz for 8x8
+            sn2 = w.snapshot_at(t - LIDAR_LATENCY)
+            tap = self.motors.tap
+            self.pipe.on_lidar(sw.lidar_frame(sn2, self.rng), sn2.t, tap.forward_mm_s, tap.rotating, t)
         self._log(t)
         if self.recorder and self.tick_n % 2 == 0:
             self.recorder.add(self)

@@ -162,10 +162,11 @@ proc = subprocess.Popen([sys.executable, os.path.join(os.path.dirname(os.path.ab
 time.sleep(1.0)
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); t0 = time.time(); seq = 0
 while time.time() - t0 < 4.6:
-    fr = np.full(16, np.nan); fr[13] = 90; fr[14] = 95                  # own balloon in two zones of the bottom row
+    n = ev.GRID; own = [(n - 1) * n + n // 2 - 1, (n - 1) * n + n // 2]            # own balloon: two zones of the bottom row
+    fr = np.full(n * n, np.nan); fr[own[0]] = 90; fr[own[1]] = 95
     sock.sendto(lx.make_packet(seq, int((time.time()-t0)*1000), fr), ("127.0.0.1", 4210)); seq += 1; time.sleep(1/30)
 out = proc.communicate(timeout=20)[0]
-mask_ok = os.path.exists("lidar_mask.json") and np.array(json.load(open("lidar_mask.json"))).flatten().nonzero()[0].tolist() == [13, 14]
+mask_ok = os.path.exists("lidar_mask.json") and np.array(json.load(open("lidar_mask.json"))).flatten().nonzero()[0].tolist() == sorted([(ev.GRID - 1) * ev.GRID + ev.GRID // 2 - 1, (ev.GRID - 1) * ev.GRID + ev.GRID // 2])
 check("learn_mask.py learns the masked zones from live UDP packets", mask_ok, out.strip().splitlines()[-2] if out.strip() else "")
 
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r in results if r[1]), len(results)))

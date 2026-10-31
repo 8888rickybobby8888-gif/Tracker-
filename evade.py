@@ -48,7 +48,9 @@ WHEELBASE_CM = 18.7       # EFFECTIVE track width for a spin on the spot. This i
 EVADE_LATENCY_S = 0.4     # delay from "threat seen" to the wheels actually turning (camera + network + Bluetooth)
 TTC_MARGIN_S = 0.4        # extra safety time on top of the turn time
 
-GRID = 4                  # lidar resolution: 4 (4x4) or 8 (8x8). Must match the ESP32 sketch.
+LIDAR_HZ = 15              # frames per second the sensor delivers: 15 for 8x8, 30 for 4x4 (also what the simulator uses). MUST match lidar_udp.h
+GRID = 8                  # lidar resolution: 4 (4x4, up to 60 Hz) or 8 (8x8, 15 Hz). MUST match LIDAR_GRID in lidar_udp.h. A frame of the
+                          # wrong size is ignored with a message. (A mask from learn_mask.py is per-resolution: re-learn after changing it.)
 FOV_DEG = 60.0            # horizontal field of view (Pololu spec for the VL53L7CX)
 COL0_IS_ROVER_LEFT = True # False if column 0 turns out to be the rover's RIGHT (do the hand-wave test)
 USE_ROWS = None           # None = all rows, or e.g. [1, 2] to ignore rows that see the floor
@@ -231,6 +233,7 @@ class ChaserDetector:
         self._last_t = None
         self._state = Threat()
         self.last_update_wall = None
+        self.mismatch = None            # the size of a frame that did not fit the grid (set once, with a message)
 
     # ---- geometry -----------------------------------------------------------
     def col_offset_deg(self, c):
@@ -250,6 +253,12 @@ class ChaserDetector:
     def update(self, frame_mm, t, own_forward_mm_s=0.0, rotating=False, wall=None):
         """frame_mm: n*n distances in mm (nan = no reading). t: sensor time in seconds."""
         n = self.n
+        if np.size(frame_mm) != n * n:                             # the ESP32 and GRID disagree: ignore it, say so ONCE, stay "not alive"
+            if self.mismatch is None:
+                print(f"LIDAR: a frame of {np.size(frame_mm)} zones arrived but GRID is {n} ({n * n} zones). Set GRID in evade.py "
+                      f"to match LIDAR_GRID in lidar_udp.h. The lidar is ignored until they agree.")
+            self.mismatch = int(np.size(frame_mm))
+            return self._state
         if self._last_t is not None and t < self._last_t:          # sender restarted
             self._hist.clear()
             self._confirm = 0

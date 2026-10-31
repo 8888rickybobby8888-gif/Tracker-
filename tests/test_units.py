@@ -542,6 +542,30 @@ _pe.safe_on_state({"follower": {"x": 0.2, "y": 0.2, "yaw": 0.0, "age": 0.0}, "A"
 check("safe_on_state: an error in the planner does not propagate; the rover stops and yaw goes to None",
       _good_yaw is not None and _pe.yaw_to_leader is None and _se.stops >= 1, f"yaw {_good_yaw} -> {_pe.yaw_to_leader}, {_se.stops} stops")
 
+# ---- 8x8 lidar mode, and a frame of the wrong size ----
+def _frame8(objs=()):
+    f = np.full((8, 8), np.nan)
+    for (r, c), d in objs:
+        f[r, c] = d
+    return f.ravel()
+_d8 = ev.ChaserDetector(8)
+_hit8 = None
+for _i in range(30):                                                 # a chaser closing from behind-left at 300 mm/s (15 Hz frames)
+    d = 1000 - 300 * (_i / 15.0)
+    s8 = _d8.update(_frame8([((r, 1), d) for r in range(2, 6)]), _i / 15.0, 0.0, False, wall=_i / 15.0)
+    if s8.active and _hit8 is None: _hit8 = (_i, s8.offset_deg)
+check("8x8 lidar: a chaser closing from behind-left is flagged (once its time to contact is short enough), on the left, at 15 Hz",
+      _hit8 is not None and 8 <= _hit8[0] <= 24 and _hit8[1] > 0, f"{_hit8}")
+_m8 = ev.ChaserDetector(8)
+_own = [_frame8([((7, 3), 90), ((7, 4), 95)]) for _ in range(30)]
+_mk = _m8.learn_mask(_own)
+check("8x8 lidar: learn_mask masks the two always-close zones of your own balloon and nothing else", _mk.sum() == 2 and _mk[7, 3] and _mk[7, 4], f"{_mk.sum()} zones")
+_dm = ev.ChaserDetector(8)
+_dm.mismatch = None
+_st = _dm.update(np.full(16, 300.0), 0.0, wall=0.0)                  # a 4x4 frame sent to an 8x8 detector
+check("lidar frame of the wrong size: ignored (no exception), no threat, detector stays not-alive, mismatch recorded",
+      not _st.active and _dm.mismatch == 16 and not _dm.lidar_alive(0.0), f"mismatch={_dm.mismatch}")
+
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]
 for r_ in failed:

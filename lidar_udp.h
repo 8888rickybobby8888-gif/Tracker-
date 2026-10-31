@@ -28,8 +28,8 @@
 #define LIDAR_SDA 13            // CHANGE to free pins on your board
 #define LIDAR_SCL 32
 #define LIDAR_UDP_PORT 4210     // must match --lidar-port in follow.py
-#define LIDAR_GRID 4            // 4 = 4x4 zones (faster), 8 = 8x8 zones. Must match GRID in evade.py
-#define LIDAR_HZ 30             // I believe 4x4 allows up to 60 Hz and 8x8 up to 15 Hz
+#define LIDAR_GRID 8            // 4 = 4x4 zones (up to 60 Hz), 8 = 8x8 zones (15 Hz). MUST match GRID in evade.py
+#define LIDAR_HZ 15             // 8x8 allows up to 15 Hz (4x4 up to 60 Hz: use 30 there)
 
 static SparkFun_VL53L5CX lidarDev;
 static VL53L5CX_ResultsData lidarData;

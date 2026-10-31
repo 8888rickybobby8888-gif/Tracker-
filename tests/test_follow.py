@@ -83,10 +83,11 @@ check("no arena.json: falls back to the straight yaw", vals and abs(vals[-1]) < 
 
 # 4. lidar chaser behind-left over real UDP -> an evasion turn to the left, never chasing mid-turn, clean shutdown
 def esp32_chaser(t):
-    f = np.full((4, 4), np.nan)
+    n = evade.GRID                                           # whatever resolution the detector is set to (4x4 or 8x8)
+    f = np.full((n, n), np.nan)
     if t > 0.8:
         d = 1000 - 300 * (t - 0.8)
-        if d > 100: f[1, 0] = d; f[2, 0] = d
+        if d > 100: f[n // 4:n - n // 4, 0:max(1, n // 4)] = d      # the middle rows, the leftmost column(s): behind-left
     return f
 ev4, ch, _ = run_follow(["--camera", "0"], states_fn=lambda t: {"follower": {"x": 0.3, "y": 0.2, "yaw": 0.0, "age": 0}}, esp32_fn=esp32_chaser, secs=3.5)
 turns = [e for e in ev4 if e[0] == "evade-turn"]

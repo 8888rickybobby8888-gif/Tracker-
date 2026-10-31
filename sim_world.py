@@ -403,13 +403,17 @@ class Renderer:
 
 
 # ------------------------------------------------------------------------------------------------------ sensors
-def lidar_frame(snap, rng, lidar_back=0.05, own_balloon=True):
-    """Rear 4x4 lidar, millimetres, row-major, nan = no reading. Column 0 = the rover's LEFT."""
+def lidar_frame(snap, rng, lidar_back=0.05, own_balloon=True, grid=None):
+    """Rear grid x grid lidar (4x4 or 8x8, evade.GRID by default), millimetres, row-major, nan = no reading. Column 0 = the rover's LEFT.
+    Robots show in the middle rows, your own balloon in the bottom rows of the middle columns (about +-15 degrees)."""
+    n = ev.GRID if grid is None else grid
     x, y, yaw, _ = snap.agents["follower"]
     ox, oy = x - lidar_back * math.cos(yaw), y - lidar_back * math.sin(yaw)
-    out = np.full((4, 4), np.nan)
-    for c in range(4):
-        ang = yaw + math.pi - math.radians(22.5 - 15.0 * c)
+    out = np.full((n, n), np.nan)
+    step = 60.0 / n
+    obj_rows = range(n // 4, n - n // 4)
+    for c in range(n):
+        ang = yaw + math.pi - math.radians(30.0 - step / 2.0 - step * c)
         dx, dy = math.cos(ang), math.sin(ang)
         best = None
         for name, (ax, ay, _, popped) in snap.agents.items():
@@ -420,15 +424,15 @@ def lidar_frame(snap, rng, lidar_back=0.05, own_balloon=True):
                 best = t
         if best is not None and best <= 3.5:
             mm = best * 1000.0 + rng.normal(0, 4.0)
-            out[1, c] = out[2, c] = mm
+            for r in obj_rows:
+                out[r, c] = mm
     if own_balloon:
-        out[3, 1] = out[3, 2] = 90.0 + rng.normal(0, 2.0)
-    drop = rng.random((4, 4)) < 0.02
+        for r in range(n - n // 4, n):
+            for c in range(n // 2 - n // 4, n // 2 + n // 4):
+                out[r, c] = 90.0 + rng.normal(0, 2.0)
+    drop = rng.random((n, n)) < 0.02
     out[drop] = np.nan
     return out.ravel()
-
-
-TAPE_WIDTH_M = 0.04              # the tape band outside the inner edge; beyond it the (light) room floor
 
 
 def floor_flags(follower):
