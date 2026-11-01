@@ -237,6 +237,22 @@ point behind the target (where your pin meets its balloon). Close to that point 
   are clamped, not an error.
 - If the opponent is hardly moving its heading is unknown, so it aims at the opponent itself (the front, possibly).
 
+## Connecting the rover's ESP32 to a WiFi hotspot (the WiFi route; untested on hardware)
+The ESP32 joins the hotspot as an ordinary WiFi client. The repo's files don't do the joining: the stock `CameraWebServer` example does, and
+`lidar_udp.h` plugs into it.
+1. Make a **2.4 GHz** hotspot (the computer's mobile hotspot or a phone's). The ESP32 cannot use 5 GHz.
+2. Arduino IDE: *File > Examples > ESP32 > Camera > CameraWebServer*. At the top set `const char* ssid = "YourHotspot";` and
+   `const char* password = "YourPassword";`, and pick your camera model.
+3. Add `lidar_udp.h` to that sketch folder and make the three small edits described at the top of the file (`lidarBegin()` in `setup()`,
+   the lidar send in `loop()`).
+4. Flash it and open the Serial Monitor at 115200 baud. On boot it prints the board's address: `Camera Ready! Use 'http://192.168.x.x'`.
+5. Put the computer on the same hotspot (if the hotspot is on the computer, it already is).
+6. Run `python follow.py --camera 1 --onboard http://192.168.x.x:81/stream` (camera stream = port 81).
+
+The lidar needs nothing more: it broadcasts UDP on port 4210 and `follow.py` listens there by default. If the hotspot blocks broadcast (some
+phone hotspots do), set `LIDAR_DEST` in `lidar_udp.h` to the computer's IP. The board's address can change on each reconnect: reserve a fixed
+address for it in the hotspot's settings if you can. Tandem details and WiFi vs ESP-NOW: `docs/WIFI_VS_ESPNOW.md`.
+
 ## Tandem: external camera + the follower's own camera (untested on hardware)
 ```
 python follow.py --camera 1 --onboard http://<esp32>:81/stream
