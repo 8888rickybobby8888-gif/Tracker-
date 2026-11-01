@@ -30,13 +30,11 @@ import evade                      # evade.MAX_SPEED_CM_S is the global speed cap
 
 def chase(yaw):
     if yaw is None:
-        return                      # opponent not seen: do nothing (or put a search move here)
-
-    # ---- EXAMPLE (switched off). Remove the # marks to try it, in the simulator first. ----
-    # if yaw > 10:
-    #     Motors.turnDegrees(-min(yaw, 20))     # opponent on the left: small left turn
-    # elif yaw < -10:
-    #     Motors.turnDegrees(min(-yaw, 20))     # opponent on the right: small right turn
-    # else:
-    #     Motors.write(15, 15, 0.2)             # roughly lined up: short drive forward
-    pass
+        return                                          # opponent not seen: do nothing (or put a search move here)
+    a = min(abs(yaw), 60)                               # angle off, capped: full turn speed from 60 degrees on
+    t = a / 60 * 30                                     # adaptive turn speed (your Math.scale(a, 0, 60, 0, 30))
+    fwd = 22 * (1 - a / 60)                             # drive less the further off you are
+    if yaw > 0:
+        Motors.write(fwd - t, fwd + t)                  # opponent on the left: steer left
+    else:
+        Motors.write(fwd + t, fwd - t)                  # opponent on the right: steer right
