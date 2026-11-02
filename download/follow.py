@@ -41,6 +41,8 @@ yaw_to_leader = None              # the variable your chase(yaw) gets: yaw to th
 yaw_to_target = None              # straight at the target, ignoring the route (for reference)
 stop = threading.Event()
 MASK_FILE = "lidar_mask.json"
+ROVER_ID = 1                      # YOUR rover's number (the ID on the rover / in the Micromelon app). --rover N overrides it
+
 
 
 def _publish(yaw, target_yaw="same"):      # called by the vision code every frame
@@ -92,7 +94,7 @@ def main(argv=None):
                          "bridge: needs --lidar-serial) instead of the external camera")
     ap.add_argument("--camera", type=int)
     ap.add_argument("--flip", action="store_true")
-    ap.add_argument("--rover", type=int, default=1, help="rover ID for Bluetooth (default 1)")
+    ap.add_argument("--rover", type=int, default=ROVER_ID, help=f"rover ID for Bluetooth (default ROVER_ID at the top of follow.py = {ROVER_ID})")
     ap.add_argument("--lidar-port", type=int, default=4210)
     ap.add_argument("--lidar-serial", metavar="PORT", default=None,
                     help="get the lidar over USB serial from an ESP-NOW bridge ESP32 (e.g. COM5 or /dev/ttyUSB0) instead of WiFi UDP")
@@ -122,7 +124,7 @@ def main(argv=None):
             evade.install_speed_clamp(Motors)               # a chase that asks for 31 cm/s is clamped, not an error
             tap.install(rc)                                 # learn own speed/turning from motor commands
             ready.set()
-            print("Rover connected: the chase and the defence are ON.")
+            print(f"Rover {args.rover} connected: the chase and the defence are ON.")
         except Exception as e:
             conn["err"] = e
             print("ROVER CONNECTION FAILED:", repr(e), "-- the window stays open, the rover will not move. Esc to quit.")
@@ -194,9 +196,9 @@ def main(argv=None):
 
     def _status():
         if conn["err"] is not None:
-            return "ROVER CONNECTION FAILED (see the terminal)"
+            return f"ROVER {args.rover} CONNECTION FAILED (see the terminal)"
         if not ready.is_set():
-            return "CONNECTING TO ROVER..."
+            return f"CONNECTING TO ROVER {args.rover}..."
         return "PAUSED (P or space = resume)" if brain.paused else ("ALL OPPONENTS POPPED: stopped" if brain._last_mode == "done" else "")
 
     def brain_when_ready():
