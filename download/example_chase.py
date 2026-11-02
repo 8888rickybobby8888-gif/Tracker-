@@ -1,0 +1,32 @@
+"""
+example_chase.py - a complete, working chase() written the way a block program would be. Paste the idea into
+my_chase.py, or copy this file over it. The simulator (simulate.py) drives the rover with exactly this code.
+
+yaw = degrees to turn to face the next waypoint (+ = left, - = right), or None if nothing is seen.
+
+chase() is called about 20 times a second and does NOT wait: each call just sets the wheel speeds (they keep that speed
+until the next call), steering in proportion to yaw. That keeps the rover moving at a steady 22 cm/s, which matters: a
+chase that does 'one short move, then wait for the camera' averages under 10 cm/s, slower than a hunter, and is also blind
+to threats for the whole move.
+"""
+from micromelon import *
+
+
+_search = [0]                                       # how long we have been searching (calls)
+
+
+def chase(yaw):
+    if yaw is None:                                 # nothing seen: look around. Mostly spin on the spot, and every few seconds
+        _search[0] += 1                             # creep a short way in a small circle, so we leave a spot where something
+        if _search[0] % 34 < 24:                    # (say a robot we popped) is hiding our marker from the camera. ~20 calls/s
+            Motors.write(-12, 12)
+        else:
+            Motors.write(8, 16)
+        return
+    _search[0] = 0
+    if abs(yaw) > 18:                               # well off target: turn almost on the spot first
+        w = max(-20, min(20, 0.5 * yaw))            # + yaw = target on the left = turn left = left wheel back, right forward
+        Motors.write(-w, w)
+    else:                                           # roughly lined up: drive, steering gently toward it
+        steer = max(-7, min(7, 0.5 * yaw))         # + yaw: slow the left wheel
+        Motors.write(22 - steer, 22 + steer)

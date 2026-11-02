@@ -1,0 +1,5 @@
+opencv-contrib-python>=4.7
+numpy
+micromelon
+pillow
+pyserial        # only for --lidar-serial (the ESP-NOW bridge)

@@ -1,0 +1,15 @@
+WHAT IS IN THIS FOLDER
+  *.py                 run on the COMPUTER (Python 3). Install once:  pip install -r requirements.txt
+  my_chase.py          YOUR chase code (edit this one)
+  markers/             print marker_0 (on the follower) and marker_8 (flat on the floor); markers_sheet.pdf has both
+  esp32/               flash onto the ESP32 (Arduino IDE): lidar_udp.h goes in the CameraWebServer sketch folder
+                       (see the top of that file); espnow_bridge/ and cam_espnow.h are only for the optional ESP-NOW route
+  docs/                WIFI_VS_ESPNOW.md (setup + comparison), CODE_TOUR.md, EXPERIMENTS.md
+  README.md            Quick start and every option. HANDOFF.md = project state.
+
+FIRST RUN
+  1. pip install -r requirements.txt
+  2. python mark_arena.py        (or scan_arena.py) to save arena.json
+  3. python follow.py --camera 1                                     external camera only
+     python follow.py --camera 1 --onboard http://<esp32-ip>:81/stream     tandem with the rover's own camera
+Not included on purpose: the simulator and tests (simulate.py, sim_world.py, tests/, run_tests.py, sim_output/). Get them from the repo.
