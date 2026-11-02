@@ -41,6 +41,7 @@ yaw_to_leader = None              # the variable your chase(yaw) gets: yaw to th
 yaw_to_target = None              # straight at the target, ignoring the route (for reference)
 stop = threading.Event()
 MASK_FILE = "lidar_mask.json"
+AUTO_CONNECT_S = 5.0              # the window counts down this long before connecting, so you can press R and change the rover ID
 ROVER_ID = 1                      # YOUR rover's number (the ID on the rover / in the Micromelon app). --rover N overrides it
 
 
@@ -114,20 +115,30 @@ def main(argv=None):
     print(f"Max wheel speed: {evade.MAX_SPEED_CM_S:.0f} cm/s (applies to every motor command)")
     rc = RoverController()
     tap = evade.MotionTap(OPTYPE.MOTOR_SET)
-    ready, conn = threading.Event(), {"err": None}           # the rover connects in the BACKGROUND so the window opens first
+    ready, conn = threading.Event(), {"err": None, "busy": False}
+    rid = {"id": args.rover, "typing": None, "go_at": time.time() + AUTO_CONNECT_S}    # the rover ID is chosen in the window
 
     def connect_rover():
+        conn["busy"], conn["err"] = True, None
         try:
-            print(f"Connecting to rover {args.rover} by Bluetooth (the camera window is already up)...")
-            rc.connectBLE(args.rover)
+            print(f"Connecting to rover {rid['id']} by Bluetooth (the camera window is already up)...")
+            rc.connectBLE(rid["id"])
             rc.startRover()
             evade.install_speed_clamp(Motors)               # a chase that asks for 31 cm/s is clamped, not an error
             tap.install(rc)                                 # learn own speed/turning from motor commands
             ready.set()
-            print(f"Rover {args.rover} connected: the chase and the defence are ON.")
+            print(f"Rover {rid['id']} connected: the chase and the defence are ON.")
         except Exception as e:
             conn["err"] = e
-            print("ROVER CONNECTION FAILED:", repr(e), "-- the window stays open, the rover will not move. Esc to quit.")
+            print(f"ROVER {rid['id']} CONNECTION FAILED:", repr(e), "-- press R in the window to change the ID, Enter to retry.")
+        finally:
+            conn["busy"] = False
+
+    def connector():                                        # connects when the countdown ends or Enter is pressed
+        while not stop.is_set() and not ready.is_set():
+            if rid["typing"] is None and not conn["busy"] and conn["err"] is None and time.time() >= rid["go_at"]:
+                connect_rover()
+            time.sleep(0.1)
 
     tandem = bool(args.onboard) and args.camera is not None      # --camera N --onboard SRC: BOTH cameras, external is primary
     ext = None if (args.onboard and not tandem) else evade.ExternalWatch()      # external camera: chasers from any direction
@@ -191,14 +202,36 @@ def main(argv=None):
         print(f"Listening for lidar on UDP port {args.lidar_port}")
 
     def _on_key(key):
+        if not ready.is_set() and not conn["busy"]:         # rover ID entry (digits would otherwise pick the balloon slot)
+            if rid["typing"] is None:
+                if key in (ord("r"), ord("R")):
+                    rid["typing"] = ""
+                    return True
+                if key in (13, 10):                         # Enter: connect now (or retry after a failure)
+                    conn["err"], rid["go_at"] = None, 0.0
+                    return True
+            else:
+                if ord("0") <= key <= ord("9") and len(rid["typing"]) < 3:
+                    rid["typing"] += chr(key)
+                elif key in (8, 127):
+                    rid["typing"] = rid["typing"][:-1]
+                elif key in (13, 10):
+                    if rid["typing"]:
+                        rid["id"] = int(rid["typing"])
+                    rid["typing"], conn["err"], rid["go_at"] = None, None, 0.0
+                return True
         if key in (ord("p"), ord(" ")):                     # PAUSE / RESUME: the rover stands still while paused
             print("PAUSED: rover stopped" if pipe.toggle_pause() else "RESUMED")
 
     def _status():
-        if conn["err"] is not None:
-            return f"ROVER {args.rover} CONNECTION FAILED (see the terminal)"
         if not ready.is_set():
-            return f"CONNECTING TO ROVER {args.rover}..."
+            if conn["busy"]:
+                return f"CONNECTING TO ROVER {rid['id']}..."
+            if rid["typing"] is not None:
+                return f"ROVER ID: {rid['typing']}_   (type the number, Enter = connect)"
+            if conn["err"] is not None:
+                return f"ROVER {rid['id']} FAILED (see terminal). R = change ID, Enter = retry"
+            return f"ROVER {rid['id']}: connecting in {max(0.0, rid['go_at'] - time.time()):.0f}s.  R = change ID, Enter = now"
         return "PAUSED (P or space = resume)" if brain.paused else ("ALL OPPONENTS POPPED: stopped" if brain._last_mode == "done" else "")
 
     def brain_when_ready():
@@ -231,7 +264,7 @@ def main(argv=None):
         threads.append(threading.Thread(target=watchdog, daemon=True))
     for t in threads:
         t.start()
-    threading.Thread(target=connect_rover, daemon=True).start()     # the window below opens straight away
+    threading.Thread(target=connector, daemon=True).start()          # the window below opens straight away
 
     try:
         if args.onboard and not tandem:

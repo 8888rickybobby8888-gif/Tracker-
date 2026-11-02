@@ -253,6 +253,11 @@ The lidar needs nothing more: it broadcasts UDP on port 4210 and `follow.py` lis
 phone hotspots do), set `LIDAR_DEST` in `lidar_udp.h` to the computer's IP. The board's address can change on each reconnect: reserve a fixed
 address for it in the hotspot's settings if you can. Tandem details and WiFi vs ESP-NOW: `docs/WIFI_VS_ESPNOW.md`.
 
+### Choosing the rover ID in the window
+`follow.py` opens the camera window first and counts down 5 s before connecting to the rover (`ROVER_ID` at the top of the file, or `--rover N`).
+In that window: **R** then type the number then **Enter** = connect to that rover; **Enter** = connect now; after a failure **R** / **Enter** retries.
+(The digits only enter the ID after you press R, so 1/2/3 still pick the balloon slot.)
+
 ## Tandem: external camera + the follower's own camera (untested on hardware)
 ```
 python follow.py --camera 1 --onboard http://<esp32>:81/stream

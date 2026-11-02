@@ -620,7 +620,8 @@ def main(camera=None, flip=None, on_yaw=None, on_state=None, on_draw=None, on_ke
             break
         if on_key and key != 255:
             try:
-                on_key(key)                   # e.g. follow.py: P = pause / resume the rover
+                if on_key(key):               # e.g. follow.py: P = pause / resume the rover. Returning True = key used up
+                    key = 255
             except Exception as e:
                 print("on_key error:", repr(e))
         if key == ord("m"):

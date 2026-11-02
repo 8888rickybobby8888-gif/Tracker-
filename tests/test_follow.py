@@ -20,6 +20,9 @@ def check(name, ok, detail=""):
 ARENA = {"arena": [[0, 0], [1.2, 0], [1.2, 1.1], [0, 1.1]], "nogo": [[0.525, 0.475], [0.675, 0.475], [0.675, 0.625], [0.525, 0.625]]}
 
 CONNECT_DELAY = 0.0
+KEYS = []                      # scripted key presses [(seconds, key)] and the status lines seen
+STATUS = []
+follow.AUTO_CONNECT_S = 0.0
 
 
 def run_follow(argv, states_fn=None, esp32_fn=None, secs=2.5, arena=True, drive=False):
@@ -47,8 +50,12 @@ def run_follow(argv, states_fn=None, esp32_fn=None, secs=2.5, arena=True, drive=
     def vision_main(camera, flip, on_yaw=None, on_state=None, on_draw=None, on_key=None, status=None):
         events.append(("window",))
         t0 = time.time()
+        todo = sorted(KEYS)
         while time.time() - t0 < secs:
             t = time.time() - t0
+            while todo and todo[0][0] <= t:
+                if on_key: on_key(todo.pop(0)[1])
+            if status: STATUS.append(status())
             st = states_fn(t) if states_fn else {"follower": {"x": 0.3, "y": 0.55, "yaw": 0.0, "age": 0}, "A": {"x": 0.9, "y": 0.55, "age": 0}}
             if on_yaw: on_yaw(0.0)
             if on_state: on_state(st)
@@ -159,6 +166,14 @@ CONNECT_DELAY = 0.0
 names = [e[0] for e in ev_slow]
 check("the window opens BEFORE the (slow) rover connection finishes", "window" in names and "connect" in names and names.index("window") < names.index("connect"), str(names[:4]))
 check("... and the rover is still connected and started afterwards", "start" in names)
+
+follow.AUTO_CONNECT_S = 30.0                                  # would wait 30 s: only the GUI can start the connection
+KEYS[:] = [(0.3, ord("r")), (0.4, ord("4")), (0.5, ord("2")), (0.6, 13)]
+STATUS.clear()
+ev_id, _, _ = run_follow(["--camera", "0"], secs=2.0)
+follow.AUTO_CONNECT_S = 0.0; KEYS.clear()
+check("rover ID typed in the window (R, 4, 2, Enter) connects to rover 42", ("connect", 42) in ev_id, str([e for e in ev_id if e[0] == "connect"]))
+check("the window shows the ID prompt while typing", any("ROVER ID: 42_" in x for x in STATUS), str(STATUS[:3]))
 
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r in results if r[1]), len(results)))
 for r in results:
