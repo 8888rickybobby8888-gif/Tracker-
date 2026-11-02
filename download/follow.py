@@ -111,12 +111,21 @@ def main(argv=None):
         evade.set_max_speed(args.max_speed)
     print(f"Max wheel speed: {evade.MAX_SPEED_CM_S:.0f} cm/s (applies to every motor command)")
     rc = RoverController()
-    rc.connectBLE(args.rover)
-    rc.startRover()
-
-    evade.install_speed_clamp(Motors)                       # a chase that asks for 31 cm/s is clamped, not an error
     tap = evade.MotionTap(OPTYPE.MOTOR_SET)
-    tap.install(rc)                                         # learn own speed/turning from motor commands
+    ready, conn = threading.Event(), {"err": None}           # the rover connects in the BACKGROUND so the window opens first
+
+    def connect_rover():
+        try:
+            print(f"Connecting to rover {args.rover} by Bluetooth (the camera window is already up)...")
+            rc.connectBLE(args.rover)
+            rc.startRover()
+            evade.install_speed_clamp(Motors)               # a chase that asks for 31 cm/s is clamped, not an error
+            tap.install(rc)                                 # learn own speed/turning from motor commands
+            ready.set()
+            print("Rover connected: the chase and the defence are ON.")
+        except Exception as e:
+            conn["err"] = e
+            print("ROVER CONNECTION FAILED:", repr(e), "-- the window stays open, the rover will not move. Esc to quit.")
 
     tandem = bool(args.onboard) and args.camera is not None      # --camera N --onboard SRC: BOTH cameras, external is primary
     ext = None if (args.onboard and not tandem) else evade.ExternalWatch()      # external camera: chasers from any direction
@@ -148,7 +157,7 @@ def main(argv=None):
     pipe = pipeline.Pipeline(detector, ext, planner, my_chase.chase, MicromelonMotors(), read_ir,
                              read_floor=read_floor,
                              publish=_publish, motion=lambda: (tap.left, tap.right))
-    on_state = lambda st: pipe.safe_on_state(st, time.time())     # called by tracker.py every frame
+    on_state = lambda st: pipe.safe_on_state(st, time.time()) if ready.is_set() else None     # called by tracker.py every frame
     brain = pipe.brain
     receiver = None
     jpeg_src = None
@@ -165,7 +174,7 @@ def main(argv=None):
         feed = onboard.OnboardFeed(cam, onboard.MultiTracker(_trk.OPPONENT_HSV),
                                    lambda b, t: pipe.on_onboard(b, time.time()))
         print("TANDEM: external camera = primary, the follower's own camera sharpens the facing when the marker is hidden.")
-    on_frame = lambda vals, t: pipe.on_lidar(vals, t, tap.forward_mm_s, tap.rotating, time.time())
+    on_frame = lambda vals, t: pipe.on_lidar(vals, t, tap.forward_mm_s, tap.rotating, time.time()) if ready.is_set() else None
     if args.no_lidar:
         print("Running without the rear lidar: " + ("evasion uses the external camera only (blind to a chaser it can't see)."
               if not args.onboard else "WARNING: nothing will evade a chaser (onboard camera mode has no other source)."))
@@ -184,9 +193,19 @@ def main(argv=None):
             print("PAUSED: rover stopped" if pipe.toggle_pause() else "RESUMED")
 
     def _status():
+        if conn["err"] is not None:
+            return "ROVER CONNECTION FAILED (see the terminal)"
+        if not ready.is_set():
+            return "CONNECTING TO ROVER..."
         return "PAUSED (P or space = resume)" if brain.paused else ("ALL OPPONENTS POPPED: stopped" if brain._last_mode == "done" else "")
 
-    threads = [threading.Thread(target=brain.run, args=(stop, lambda: yaw_to_leader), daemon=True)]
+    def brain_when_ready():
+        while not stop.is_set() and not ready.wait(0.2):
+            pass                                            # nothing may drive until the rover is connected
+        if ready.is_set():
+            brain.run(stop, lambda: yaw_to_leader)
+
+    threads = [threading.Thread(target=brain_when_ready, daemon=True)]
     if receiver or ext or feed:
         def watchdog():
             warned = {}
@@ -210,6 +229,7 @@ def main(argv=None):
         threads.append(threading.Thread(target=watchdog, daemon=True))
     for t in threads:
         t.start()
+    threading.Thread(target=connect_rover, daemon=True).start()     # the window below opens straight away
 
     try:
         if args.onboard and not tandem:
@@ -229,12 +249,16 @@ def main(argv=None):
             feed.close()
         if receiver:
             receiver.close()
-        try:
-            Motors.write(0, 0)                              # make sure it isn't left driving
-        except Exception:
-            pass
-        rc.stopRover()
-        rc.end()
+        if ready.is_set():
+            try:
+                Motors.write(0, 0)                          # make sure it isn't left driving
+            except Exception:
+                pass
+            for fn in (rc.stopRover, rc.end):
+                try:
+                    fn()
+                except Exception:
+                    pass
 
 
 if __name__ == "__main__":

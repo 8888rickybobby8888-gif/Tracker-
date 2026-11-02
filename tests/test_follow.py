@@ -19,6 +19,9 @@ def check(name, ok, detail=""):
 
 ARENA = {"arena": [[0, 0], [1.2, 0], [1.2, 1.1], [0, 1.1]], "nogo": [[0.525, 0.475], [0.675, 0.475], [0.675, 0.625], [0.525, 0.625]]}
 
+CONNECT_DELAY = 0.0
+
+
 def run_follow(argv, states_fn=None, esp32_fn=None, secs=2.5, arena=True, drive=False):
     """One run of follow.main with everything fake. Returns what happened."""
     events, chase_yaws, drawn = [], [], []
@@ -29,7 +32,7 @@ def run_follow(argv, states_fn=None, esp32_fn=None, secs=2.5, arena=True, drive=
         def __init__(s):
             s.writeAttribute = lambda op, data, timeout=None: True
             s.doMotorOperation = lambda op, data, timeout=None: None
-        def connectBLE(s, i): events.append(("connect", i))
+        def connectBLE(s, i): time.sleep(CONNECT_DELAY); events.append(("connect", i))
         def startRover(s): events.append(("start",))
         def stopRover(s): events.append(("stop",))
         def end(s): events.append(("end",))
@@ -42,6 +45,7 @@ def run_follow(argv, states_fn=None, esp32_fn=None, secs=2.5, arena=True, drive=
     evade.set_max_speed(30)
 
     def vision_main(camera, flip, on_yaw=None, on_state=None, on_draw=None, on_key=None, status=None):
+        events.append(("window",))
         t0 = time.time()
         while time.time() - t0 < secs:
             t = time.time() - t0
@@ -148,6 +152,13 @@ check("--floor-sensors: a run with tape under the sensors completes and shuts do
       [e[0] for e in ev7 if e[0] in ("stop", "end")] == ["stop", "end"])
 check("--floor-sensors: the sensors are read (calibration + polling)", len(floor_calls) >= 12, f"{len(floor_calls)} reads")
 floor_mode[0] = "floor"
+
+CONNECT_DELAY = 0.8                                          # a slow Bluetooth connection
+ev_slow, _, _ = run_follow(["--camera", "0"], secs=2.5)
+CONNECT_DELAY = 0.0
+names = [e[0] for e in ev_slow]
+check("the window opens BEFORE the (slow) rover connection finishes", "window" in names and "connect" in names and names.index("window") < names.index("connect"), str(names[:4]))
+check("... and the rover is still connected and started afterwards", "start" in names)
 
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r in results if r[1]), len(results)))
 for r in results:
