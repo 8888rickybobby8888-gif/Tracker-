@@ -54,6 +54,7 @@ MARKER_SIZE = 0.08                # side length of the follower's marker, metres
 MARKER_LAYOUT = "top"
 TOP_MARKER_ID = 0
 TOP_MARKER_OFFSET = (0.0, 0.0)    # "top": marker centre from the rover's centre: (forward, left), metres (MEASURE)
+LOCK_PREVIEW = True               # show the live picture (with a message) while the floor marker is being looked for
 PLANE_MARKER = True               # a marker that lies flat on the rover gets its heading from the floor plane, not from solvePnP (no 30-60 degree flips at oblique camera angles)
 MARKER_HEIGHT = 0.08              # floor -> marker centre, metres (MEASURE; "top": the rover's top surface)
 POST_RADIUS = 0.04                # "post" only: robot centre -> face of a marker, metres
@@ -585,15 +586,45 @@ def pick_camera(max_index=8):
 
 
 def main(camera=None, flip=None, on_yaw=None, on_state=None, on_draw=None, on_key=None, status=None,
-         headless=False, on_frame=None, should_stop=None, on_tick=None):
+         headless=False, on_frame=None, should_stop=None, on_tick=None, on_preview=None):
     """headless=True: no OpenCV window (the dashboard shows the picture). on_frame(frame, raw, tr, st) gets every annotated frame,
     the raw one, the Tracker and the state. should_stop() -> True ends the loop. on_tick(tr, cap) runs once per loop (before the read)."""
     cap, size = open_camera(camera, flip)
     tr = Tracker(size=size)
     print(f"Camera {size[0]}x{size[1]}, assumed FOV {tr.fov_deg:.0f} deg")
     print("Locking floor frame - keep the floor marker visible and the camera still...")
-    if not tr.lock_floor(cap):
-        sys.exit("Could not see the floor marker.")
+    if not headless:
+        cv2.namedWindow("tracker")                                  # the window is up BEFORE the floor lock, so you can see what the camera sees
+
+    class _Preview:                                                  # shows the live picture, with a message, while the floor marker is being looked for
+        def __init__(self, c):
+            self.c, self.n = c, 0
+
+        def read(self):
+            ok, fr = self.c.read()
+            if ok and LOCK_PREVIEW:
+                self.n += 1
+                if self.n % 2 == 0:
+                    shown = fr.copy()
+                    cv2.putText(shown, f"Looking for the floor marker (ID {FLOOR_ID}): keep it in view and the camera still", (10, 30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 255), 2, cv2.LINE_AA)
+                    if headless:
+                        if on_preview is not None:
+                            on_preview(shown)
+                    else:
+                        cv2.imshow("tracker", shown)
+                        cv2.waitKey(1)
+            return ok, fr
+
+    pcap, tries = _Preview(cap), 0
+    while not tr.lock_floor(pcap, timeout=5.0):
+        tries += 1
+        print(f"Still looking for the floor marker (ID {FLOOR_ID}) ... is it flat, in view and well lit? (attempt {tries})")
+        if (should_stop is not None and should_stop()) or (not headless and cv2.waitKey(1) & 0xFF == 27):
+            cap.release()
+            if not headless:
+                cv2.destroyAllWindows()
+            return
     print("Floor found (re-solved every frame, so the camera may move: keep the floor marker in view).  1/2/3 pick opponent slot, then click its balloon to set the colour | M mask | F re-lock | [ ] FOV | Esc quit")
 
     latest = {"frame": None}
@@ -608,7 +639,6 @@ def main(camera=None, flip=None, on_yaw=None, on_state=None, on_draw=None, on_ke
             print(f"opponent {active['slot']} colour set from click: H={h:.0f} S={sat:.0f} V={val:.0f}")
 
     if not headless:
-        cv2.namedWindow("tracker")
         cv2.setMouseCallback("tracker", on_mouse)
     show_mask = False
     while True:

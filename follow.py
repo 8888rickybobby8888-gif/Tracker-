@@ -133,7 +133,7 @@ def main(argv=None):
     def connect_rover():
         conn["busy"], conn["err"] = True, None
         try:
-            print(f"Connecting to rover {rid['id']} by Bluetooth (the camera window is already up)...")
+            print(f"Connecting to rover {rid['id']} by Bluetooth (the camera window / dashboard is already up)...")
             rc.connectBLE(rid["id"])
             rc.startRover()
             evade.install_speed_clamp(Motors)               # a chase that asks for 31 cm/s is clamped, not an error
@@ -273,6 +273,12 @@ def main(argv=None):
             ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 72])
             if ok:
                 shared["jpg"], shared["jpg_t"] = buf.tobytes(), time.time()
+
+    def on_preview_cam(frame):                               # the picture while the floor marker is still being looked for
+        import cv2
+        ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+        if ok:
+            shared["jpg"], shared["jpg_t"] = buf.tobytes(), time.time()
 
     def on_tick(tr, cap):                                    # runs in the vision loop: changes that must happen there
         v = shared.get("fov")
@@ -577,7 +583,8 @@ def main(argv=None):
                          on_key=_on_key, status=_status,
                          on_draw=(lambda frame, tr: plan.draw_plan(frame, tr, planner)) if planner else None,
                          headless=use_dash, on_frame=on_frame_cam if use_dash else None,
-                         should_stop=stop.is_set, on_tick=on_tick if use_dash else None)
+                         should_stop=stop.is_set, on_tick=on_tick if use_dash else None,
+                         on_preview=on_preview_cam if use_dash else None)
     finally:
         stop.set()
         if dash:

@@ -48,6 +48,7 @@ def waitKey(ms=0):
     if callable(act): act(); return 255
     return act
 cv2.waitKey = waitKey
+tk.LOCK_PREVIEW = False                                   # the scripted keys count waitKey calls; the preview has its own test below
 def balloon_xy(name):
     x, y, yaw, _ = snap0.agents[name]
     return x - sw.BALLOON_BACK * math.cos(yaw), y - sw.BALLOON_BACK * math.sin(yaw)
@@ -77,6 +78,14 @@ if last:
     errs = {o.name: math.hypot(s[o.name]["x"] - balloon_xy(o.name)[0], s[o.name]["y"] - balloon_xy(o.name)[1]) for o in opps}
     check("tracker.main: opponent positions within 4 cm", max(errs.values()) < 0.04, " ".join(f"{k} {v*1000:.0f}mm" for k, v in errs.items()))
 check("tracker.main: no blank/invalid frames shown", gui["bad_image"] == 0)
+
+# ---------------- 1c. headless run (the dashboard): the picture is available while the floor marker is still being looked for ----------------
+tk.LOCK_PREVIEW = True
+prev, frames_seen = [], []
+tk.main(0, None, headless=True, on_preview=lambda fr: prev.append(fr.shape),
+        on_frame=lambda frame, raw, tr, st: frames_seen.append(1), should_stop=lambda: len(frames_seen) >= 5)
+tk.LOCK_PREVIEW = False
+check("tracker.main headless: the camera picture is handed out while it looks for the floor marker, then every frame", len(prev) >= 3 and len(frames_seen) >= 5, f"{len(prev)} preview, {len(frames_seen)} frames")
 
 # ---------------- 1b. tracker.main: the pause key (P / space) and the status line ----------------
 pk = {"paused": False, "keys": [], "msgs": []}
