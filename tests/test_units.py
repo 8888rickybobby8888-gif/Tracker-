@@ -693,6 +693,37 @@ _feed = ob.OnboardFeed(_FakeCam(), _mt, lambda b, t: _got.append(b), hz=200.0)
 time.sleep(0.4); _feed.close()
 check("OnboardFeed: calls back with bearings from its own thread and reports alive", len(_got) >= 3 and "A" in _got[0], str(len(_got)))
 
+
+# ---- camera moved, rover static: the heading must not change (plane-constrained marker heading)
+import tracker as _tkc
+def _look(pos, tgt):
+    pos, tgt = np.array(pos, float), np.array(tgt, float)
+    zc = tgt - pos; zc /= np.linalg.norm(zc)
+    xc = np.cross(zc, [0, 0, 1.0]); xc /= np.linalg.norm(xc)
+    yc = np.cross(zc, xc)
+    T = np.eye(4); T[:3, :3] = np.stack([xc, yc, zc], 1); T[:3, 3] = pos
+    return np.linalg.inv(T)
+_snap_c = types.SimpleNamespace(agents={"follower": (0.45, 0.50, math.radians(20), False), "A": (1.05, 0.75, math.radians(200), False)})
+_rend_c = _swo.Renderer(seed=1)
+def _yaws(plane):
+    _tkc.PLANE_MARKER = plane
+    out = []
+    for pos, tgt in (([0.80, -0.55, 1.75], [0.80, 0.0, 0.0]), ([1.9, 0.5, 1.6], [0.80, 0.45, 0.0]), ([0.80, 1.7, 1.7], [0.80, 0.5, 0.0]), ([0.75, 0.40, 2.0], [0.75, 0.55, 0.0])):
+        cam = _swo.Cam(_tkc.intrinsics_from_fov(_swo.SIZE, 70.0), _look(pos, tgt))
+        tr = _tkc.Tracker(size=_swo.SIZE, fov_deg=70.0)
+        class _Cap:
+            def read(self_): return True, _rend_c.render(_snap_c, cam)
+        tr.lock_floor(_Cap(), n=8)
+        for _ in range(12): st = tr.update(_rend_c.render(_snap_c, cam))
+        out.append(st["follower"]["yaw"])
+    _tkc.PLANE_MARKER = True
+    return out
+_y_old, _y_new = _yaws(False), _yaws(True)
+check("camera moved, rover static: the heading from the flat marker stays within 3 deg of the truth (20) from four very different camera positions",
+      all(abs(y - 20.0) < 3.0 for y in _y_new), str([round(y, 1) for y in _y_new]))
+check("... and the old solvePnP heading was off by more than 10 deg from at least one of them (so this test would catch a regression)",
+      max(abs(y - 20.0) for y in _y_old) > 10.0, str([round(y, 1) for y in _y_old]))
+
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]
 for r_ in failed:
