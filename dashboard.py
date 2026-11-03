@@ -107,8 +107,22 @@ class Dashboard:
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
 
     def open_browser(self):
+        """Open the dashboard in the default browser. webbrowser.open() often says False or does nothing (no default browser set, WSL, remote
+        sessions), so after it the operating system's own opener is tried. Returns True if something was started."""
+        import subprocess
+        import sys
         try:
-            return webbrowser.open(self.url)
+            if webbrowser.open(self.url, new=2):
+                return True
+        except Exception:
+            pass
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(self.url)                                       # the Windows default-browser association
+                return True
+            cmd = ["open", self.url] if sys.platform == "darwin" else ["xdg-open", self.url]
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
         except Exception:
             return False
 

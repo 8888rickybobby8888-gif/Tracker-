@@ -258,6 +258,7 @@ address for it in the hotspot's settings if you can. Tandem details and WiFi vs 
 camera picture with the plan drawn on it (External / Onboard switch), arena map with the no-go zone and planned path, event log, rear lidar grid,
 evade timing, opponent colours (click **Set colour**, then the balloon), chase-target buttons, speed and field-of-view sliders, the camera
 fail-safe switch, manual drive, and **START / PAUSE / STOP** plus the **Rover ID** box and Connect button in the header.
+- If the browser does not open by itself, copy the address from the `DASHBOARD:` line in the terminal into a browser on the same computer (`--no-browser` skips the attempt).
 - The rover connects in the background (it counts down 8 s with the default ID, so you can change it first) and then **stands still until you press START**.
 - STOP stops the wheels and needs START again. Ctrl+C in the terminal, or **Quit program** (press twice), ends everything.
 - It listens on this computer only, and every command needs a random token that is inside the page, so another web page cannot press START for you.

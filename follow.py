@@ -113,6 +113,7 @@ def main(argv=None):
                          "start with the rover on bare floor inside the arena, it learns what the floor reads")
     ap.add_argument("--no-plan", action="store_true", help="don't plan routes: yaw points straight at the nearest opponent")
     ap.add_argument("--window", action="store_true", help="use the plain OpenCV window (keys) instead of the browser dashboard")
+    ap.add_argument("--no-browser", action="store_true", help="do not open the dashboard in the browser (open the printed address yourself)")
     ap.add_argument("--port", type=int, default=8765, help="dashboard port (default 8765; the next free one is used if it is busy)")
     ap.add_argument("--target", default="nearest", help='which opponent to chase: "nearest" (default) or a slot name A/B/C')
     args = ap.parse_args(argv)
@@ -515,9 +516,15 @@ def main(argv=None):
     if use_dash:
         import dashboard
         dash = dashboard.Dashboard(snapshot, frame_for, command, port=args.port)
-        print(f"Dashboard: {dash.url}   (token is added to the page automatically)")
-        if OPEN_BROWSER:
-            dash.open_browser()
+        print("=" * 70)
+        print(f"  DASHBOARD:  {dash.url}")
+        if OPEN_BROWSER and not args.no_browser:
+            print("  Opening it in your browser. If nothing opens, copy the address above into a browser on THIS computer.")
+            if not dash.open_browser():
+                print("  (could not start a browser from here: open the address above yourself)")
+        else:
+            print("  Open that address in a browser on THIS computer.")
+        print("=" * 70)
         log("INFO", "Dashboard started. Waiting for the rover to connect.")
 
         def eventer():                                       # turns mode changes into log lines
