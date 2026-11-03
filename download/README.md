@@ -253,7 +253,20 @@ The lidar needs nothing more: it broadcasts UDP on port 4210 and `follow.py` lis
 phone hotspots do), set `LIDAR_DEST` in `lidar_udp.h` to the computer's IP. The board's address can change on each reconnect: reserve a fixed
 address for it in the hotspot's settings if you can. Tandem details and WiFi vs ESP-NOW: `docs/WIFI_VS_ESPNOW.md`.
 
-### Choosing the rover ID in the window
+## The dashboard (the control screen; untested on the real rover)
+`python follow.py --camera 1` now opens a **browser dashboard** (http://127.0.0.1:8765/, opened for you) instead of the plain OpenCV window:
+camera picture with the plan drawn on it (External / Onboard switch), arena map with the no-go zone and planned path, event log, rear lidar grid,
+evade timing, opponent colours (click **Set colour**, then the balloon), chase-target buttons, speed and field-of-view sliders, the camera
+fail-safe switch, manual drive, and **START / PAUSE / STOP** plus the **Rover ID** box and Connect button in the header.
+- The rover connects in the background (it counts down 8 s with the default ID, so you can change it first) and then **stands still until you press START**.
+- STOP stops the wheels and needs START again. Ctrl+C in the terminal, or **Quit program** (press twice), ends everything.
+- It listens on this computer only, and every command needs a random token that is inside the page, so another web page cannot press START for you.
+- The old window with its keys is still there: `python follow.py --camera 1 --window` (R + number + Enter = rover ID, P = pause).
+- Needs `--camera N` (the external camera). `--onboard` on its own keeps the old window.
+- Not on the dashboard because it cannot be real: battery and ultrasonic (nothing reads them), scanning the arena (run `scan_arena.py` / `mark_arena.py`
+  first, they need the camera). The IR bars show the last reading the rover took when it had to pick a turning side.
+
+### Choosing the rover ID in the window (old window mode, --window)
 `follow.py` opens the camera window first and counts down 5 s before connecting to the rover (`ROVER_ID` at the top of the file, or `--rover N`).
 In that window: **R** then type the number then **Enter** = connect to that rover; **Enter** = connect now; after a failure **R** / **Enter** retries.
 (The digits only enter the ID after you press R, so 1/2/3 still pick the balloon slot.)

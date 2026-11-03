@@ -557,7 +557,10 @@ def pick_camera(max_index=8):
     print("No more cameras." if found else "No cameras found.")
 
 
-def main(camera=None, flip=None, on_yaw=None, on_state=None, on_draw=None, on_key=None, status=None):
+def main(camera=None, flip=None, on_yaw=None, on_state=None, on_draw=None, on_key=None, status=None,
+         headless=False, on_frame=None, should_stop=None, on_tick=None):
+    """headless=True: no OpenCV window (the dashboard shows the picture). on_frame(frame, raw, tr, st) gets every annotated frame,
+    the raw one, the Tracker and the state. should_stop() -> True ends the loop. on_tick(tr, cap) runs once per loop (before the read)."""
     cap, size = open_camera(camera, flip)
     tr = Tracker(size=size)
     print(f"Camera {size[0]}x{size[1]}, assumed FOV {tr.fov_deg:.0f} deg")
@@ -577,10 +580,18 @@ def main(camera=None, flip=None, on_yaw=None, on_state=None, on_draw=None, on_ke
             tr.set_opponent_color(active["slot"], h, sat, val)
             print(f"opponent {active['slot']} colour set from click: H={h:.0f} S={sat:.0f} V={val:.0f}")
 
-    cv2.namedWindow("tracker")
-    cv2.setMouseCallback("tracker", on_mouse)
+    if not headless:
+        cv2.namedWindow("tracker")
+        cv2.setMouseCallback("tracker", on_mouse)
     show_mask = False
     while True:
+        if should_stop is not None and should_stop():
+            break
+        if on_tick is not None:
+            try:
+                on_tick(tr, cap)
+            except Exception as e:
+                print("on_tick error:", repr(e))
         ok, frame = cap.read()
         if not ok:
             break
@@ -590,7 +601,7 @@ def main(camera=None, flip=None, on_yaw=None, on_state=None, on_draw=None, on_ke
             on_yaw(tr.yaw_to_leader(st))      # called every frame with degrees-to-nearest-opponent or None
         if on_state:
             on_state(st)                      # full state: follower pose + every opponent position
-        if show_mask:
+        if show_mask and not headless:
             cv2.imshow("opponent mask", tr.opponent_mask(frame, active["slot"]))
         draw_overlay(frame, tr, st)
         fstat, _ = tr.floor_status()
@@ -614,8 +625,17 @@ def main(camera=None, flip=None, on_yaw=None, on_state=None, on_draw=None, on_ke
                 msg = f"status error: {e!r}"[:60]
             if msg:
                 cv2.putText(frame, msg, (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (80, 80, 255), 2, cv2.LINE_AA)
-        cv2.imshow("tracker", frame)
-        key = cv2.waitKey(1) & 0xFF
+        if on_frame is not None:
+            try:
+                on_frame(frame, latest["frame"], tr, st)
+            except Exception as e:
+                print("on_frame error:", repr(e))
+        if headless:
+            time.sleep(0.001)
+            key = 255
+        else:
+            cv2.imshow("tracker", frame)
+            key = cv2.waitKey(1) & 0xFF
         if key == 27:
             break
         if on_key and key != 255:
@@ -638,7 +658,8 @@ def main(camera=None, flip=None, on_yaw=None, on_state=None, on_draw=None, on_ke
                 tr.set_fov(min(120.0, tr.fov_deg + 2))
             print("re-lock:", tr.lock_floor(cap), f"(FOV {tr.fov_deg:.0f})")
     cap.release()
-    cv2.destroyAllWindows()
+    if not headless:
+        cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":

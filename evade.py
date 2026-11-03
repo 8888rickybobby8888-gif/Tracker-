@@ -808,6 +808,9 @@ class Brain:
         self.errors = 0                                      # consecutive errors in run()
         self._backing = False                                # backing off from a slower opponent in our face
         self.paused = False                                  # the PAUSE button: wheels stopped, nothing else runs
+        self.manual = None                                   # dashboard MANUAL mode: (left, right) wheel speeds to hold, or None = automatic
+        self.threat_now = Threat()                           # the threat the last step acted on (for the dashboard)
+        self.safety_camera_stop = True                       # dashboard switches for the two fail-safes
         self._park_t = -1e9
 
     def _drive_away(self, esc):
@@ -910,7 +913,14 @@ class Brain:
         now = self.clock()
         if self.paused:
             return self._park("paused")
-        if self.external is not None and self.external.age(now) > NO_CAMERA_STOP_S:
+        if self.manual is not None:                          # MANUAL: the dashboard's arrows drive, nothing else does
+            try:
+                self.evader.motors.write(*self.manual)
+            except Exception:
+                pass
+            self._last_mode = "manual"
+            return "manual"
+        if self.safety_camera_stop and self.external is not None and self.external.age(now) > NO_CAMERA_STOP_S:
             if not self._cam_lost and self.external.last_update_wall is not None:
                 print(f"STOPPED: no frame from the external camera for {NO_CAMERA_STOP_S:.1f} s (resumes when it comes back)")
             self._cam_lost = self.external.last_update_wall is not None     # (before the very first frame we just wait quietly)
@@ -939,6 +949,7 @@ class Brain:
             lid = Threat()          # the camera says that object is an opponent that is parked or already popped: it can't
                                     # pop us unless WE swing our balloon into its pin, and turning away is exactly that move
         threat = self.fuse(lid, self.external.state(now) if self.external else Threat())
+        self.threat_now = threat
         ob = self.guard.onboard(now) if (USE_ONBOARD and self.guard is not None and hasattr(self.guard, "onboard")) else {}
         ob_used = False
         if ob and threat.active and threat.who in ob and threat.source in ("external", "both"):

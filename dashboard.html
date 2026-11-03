@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rover control</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0e1217;--panel:#161c24;--line:#2b3542;--ink:#e8edf4;--mute:#a3b0c0;--blue:#5aa9ff;--btn:#2f6fbf;--btn2:#202a36;--btn2line:#344154;--green:#3ecf9e;--go:#1d7f5e;--yellow:#f2c94c;--amber:#f2b84b;--red:#c8323a;--coral:#ff6b5b;--coral2:#ff9d92;--path:#8fb8ff;--cell:#141b24;
+ --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;--sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px}
+button{font-family:inherit;color:inherit}
+.wrap{max-width:1440px;margin:0 auto;padding:20px max(16px,env(safe-area-inset-left,0px)) 32px;display:flex;flex-direction:column;gap:16px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+h1,h2{margin:0}h2{font-size:15px;font-weight:600}h1{font-size:18px;font-weight:600}
+.mono{font-family:var(--mono)}.mute{color:var(--mute)}.small{font-size:12px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding:12px 16px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;flex:1 1 360px}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;background:var(--bg);border:1px solid var(--line);border-radius:999px;font-size:13px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--mute);flex:0 0 auto}
+.dot.ok{background:var(--green)}.dot.bad{background:var(--coral)}.dot.wait{background:var(--amber)}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px}
+.btn{min-height:44px;padding:0 16px;background:var(--btn2);color:var(--ink);border:1px solid var(--btn2line);border-radius:8px;font-size:14px;cursor:pointer}
+.btn.on{background:var(--btn);border-color:var(--btn)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.big{min-height:48px;padding:0 28px;border:0;border-radius:8px;font-size:16px;font-weight:600;letter-spacing:.08em;cursor:pointer;color:#fff}
+.big:disabled{opacity:.4;cursor:not-allowed}
+#bStart{background:var(--go)}#bPause{background:var(--yellow);color:var(--bg)}#bStop{background:var(--red)}
+.pill{padding:6px 12px;border-radius:8px;font-size:13px;font-weight:600;letter-spacing:.06em;background:var(--btn);color:#fff}
+.sep{width:1px;height:32px;background:var(--line)}
+input[type=number],input[type=text]{min-height:44px;width:84px;padding:0 10px;background:var(--bg);color:var(--ink);border:1px solid var(--btn2line);border-radius:8px;font-family:var(--mono);font-size:14px}
+.cols{display:flex;flex-wrap:wrap;gap:16px;align-items:stretch}
+.left{flex:999 1 640px;min-width:0;display:flex;flex-direction:column;gap:16px}
+.right{flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:16px}
+.video{position:relative;width:100%;aspect-ratio:16/9;background:var(--cell);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.video img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
+.video.pick{cursor:crosshair;outline:3px solid var(--yellow)}
+.vtl{position:absolute;left:16px;top:12px;display:flex;flex-direction:column;gap:6px;text-shadow:0 0 4px #000}
+.vtr{position:absolute;right:12px;top:12px;padding:6px 10px;background:var(--bg);border:1px solid var(--amber);border-radius:6px;font-size:12px;color:var(--amber)}
+.vbl{position:absolute;left:16px;bottom:10px;text-shadow:0 0 4px #000}
+.empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--mute)}
+.cell2{display:flex;flex-direction:column;gap:2px;padding:8px 12px;background:var(--bg);border:1px solid var(--line);border-radius:6px;min-width:0}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.logrow{display:flex;gap:12px;align-items:baseline;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+.tag{flex:0 0 64px;text-align:center;padding:2px 0;border-radius:4px;font-size:11px;font-weight:600;letter-spacing:.06em}
+.bar{height:8px;background:var(--bg);border-radius:4px;overflow:hidden}.bar>div{height:8px}
+.lid{display:grid;gap:4px}
+.lid div{min-height:34px;display:flex;align-items:center;justify-content:center;border-radius:5px;font-family:var(--mono);font-size:12px;border:1px solid var(--btn2line)}
+.kv{display:flex;justify-content:space-between;gap:12px;font-size:13px}
+.three{flex:1 1 340px;min-width:0}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:12px;color:var(--mute)}
+.ctl{display:flex;flex-direction:column;gap:10px;padding:14px;background:var(--bg);border:1px solid var(--line);border-radius:8px}
+.ctls{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;align-items:stretch}
+.slot{display:flex;align-items:center;gap:12px}
+.sw{flex:0 0 28px;width:28px;height:28px;border-radius:50%}
+.banner{padding:10px 12px;background:var(--bg);border:1px solid var(--line);border-radius:8px;font-size:13px}
+.banner.hot{border-color:var(--coral);color:var(--coral2)}
+@media (prefers-reduced-motion:no-preference){.btn,.big{transition:filter .12s}.btn:hover,.big:hover:not(:disabled){filter:brightness(1.15)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+ <div style="display:flex;flex-direction:column;gap:2px"><h1>Rover control</h1><span class="small mute" id="subtitle">Connecting to the program...</span></div>
+ <div class="chips" id="chips"></div>
+ <div class="row">
+  <label class="small mute" for="rid">Rover ID</label>
+  <input id="rid" type="number" min="0" max="999" value="1">
+  <button class="btn" id="bConnect" type="button">Connect</button>
+ </div>
+ <div class="row">
+  <span class="row" style="gap:8px"><span class="mute">State</span><span class="mono" style="display:inline-flex;align-items:center;gap:6px"><span class="dot" id="stDot"></span><span id="stText">-</span></span></span>
+  <span class="row" style="gap:8px"><span class="mute">Mode</span><span class="pill" id="modePill">-</span></span>
+  <span class="sep"></span>
+  <button class="big" id="bStart" type="button">START</button>
+  <button class="big" id="bPause" type="button" aria-label="Pause the rover; press again to resume">PAUSE</button>
+  <button class="big" id="bStop" type="button">STOP</button>
+ </div>
+</header>
+
+<div class="cols">
+ <div class="left">
+  <section class="panel">
+   <div class="row" style="justify-content:space-between">
+    <h2>Camera</h2>
+    <div class="row" style="gap:8px"><button class="btn on" id="camExt" type="button">External (arena)</button><button class="btn" id="camOn" type="button">Onboard (ESP32)</button></div>
+   </div>
+   <div class="video" id="video">
+    <img id="frame" alt="Live camera picture" hidden>
+    <div class="empty" id="noframe">Waiting for the first camera picture...</div>
+    <div class="vtl">
+     <div class="row" style="gap:8px"><span class="small mute">Current target</span><span class="chip mono" id="tgtChip">-</span></div>
+     <div class="row" style="gap:8px;align-items:baseline"><span class="small mute">Yaw to target</span><span class="mono" id="yawBig" style="font-size:30px;font-weight:500">-</span></div>
+     <div class="row" style="gap:8px;align-items:baseline"><span class="small" style="color:var(--path)">Next waypoint</span><span class="mono" id="wpYaw" style="font-size:18px;font-weight:500;color:var(--path)">-</span></div>
+    </div>
+    <span class="vtr" id="behind" hidden></span>
+    <span class="vbl mono small mute" id="camInfo"></span>
+   </div>
+   <span class="small mute" id="pickHint" hidden>Click the balloon in the picture to set its colour.</span>
+  </section>
+  <section class="panel" style="flex:1 1 auto">
+   <h2>Event log</h2>
+   <div id="log"></div>
+  </section>
+ </div>
+
+ <div class="right">
+  <section class="panel">
+   <h2>Arena map (external camera)</h2>
+   <svg id="map" viewBox="0 0 400 360" width="100%" role="img" aria-label="Top-down arena map with the follower, the opponents, the no-go zone and the planned path"></svg>
+   <div class="grid2" id="mapInfo"></div>
+   <div class="legend">
+    <span>Rear lidar <b style="color:var(--green)">&#9632;</b></span><span>Chaser <b style="color:var(--coral)">&#9675;</b></span>
+    <span>Planned path <b style="color:var(--path)">&#9473;</b></span><span>No-go zone and keep-out <b style="color:var(--coral2)">&#9619;</b></span>
+    <span>Waypoint <b style="color:var(--path)">&#9675;</b></span><span>Goal point <b style="color:var(--path)">&times;</b></span>
+   </div>
+  </section>
+  <section class="panel" style="flex:1 1 auto">
+   <h2>Rover sensors</h2>
+   <div id="bars" style="display:flex;flex-direction:column;gap:12px"></div>
+   <div class="grid3" id="floor"></div>
+  </section>
+ </div>
+</div>
+
+<div class="cols">
+ <section class="panel three">
+  <h2 id="lidTitle">Rear lidar</h2>
+  <div class="lid" id="lid"></div>
+  <p class="small mute" style="margin:0;line-height:1.5">Millimetres, seen from behind the rover: the left column is the rover's left. A dash means nothing in range. "masked" is your own balloon.</p>
+  <div style="margin-top:auto;display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px">
+   <div class="kv"><span class="mute">Nearest</span><span class="mono" id="lidNear">-</span></div>
+   <div class="kv"><span class="mute">Frames per second</span><span class="mono" id="lidHz">-</span></div>
+  </div>
+ </section>
+ <section class="panel three" style="gap:10px">
+  <h2>Evade timing</h2>
+  <div id="timing" style="display:flex;flex-direction:column;gap:10px"></div>
+  <div class="banner" id="evadeBanner" style="margin-top:auto">No chaser.</div>
+ </section>
+ <section class="panel three">
+  <h2>Opponent colours</h2>
+  <div id="slots" style="display:flex;flex-direction:column;gap:12px"></div>
+  <div style="margin-top:auto;display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px">
+   <span class="mute">Chase target</span>
+   <div class="grid4" id="targets"></div>
+  </div>
+ </section>
+</div>
+
+<section class="panel">
+ <h2>Controls</h2>
+ <div class="ctls">
+  <div class="ctl"><span class="mute">Mode</span>
+   <div class="grid2"><button class="btn on" id="mAuto" type="button">Auto</button><button class="btn" id="mMan" type="button">Manual</button></div>
+   <span class="small mute" style="margin-top:auto;line-height:1.5">Auto runs your chase moves with evasion on top. Manual lets you drive by hand with the arrows below.</span></div>
+  <div class="ctl"><div class="kv"><label class="mute" for="speed">Speed limit</label><span class="mono" id="speedV">30 cm/s</span></div>
+   <input id="speed" type="range" min="5" max="30" value="30" style="width:100%;accent-color:var(--blue)">
+   <div class="kv small mute mono" style="margin-top:auto"><span>5</span><span>rover max 30</span></div></div>
+  <div class="ctl"><div class="kv"><label class="mute" for="fov">External camera field of view</label><span class="mono" id="fovV">70&deg;</span></div>
+   <input id="fov" type="range" min="40" max="120" value="70" style="width:100%;accent-color:var(--blue)">
+   <div class="kv small mute mono" style="margin-top:auto"><span>40&deg;</span><span>120&deg;</span></div></div>
+  <div class="ctl"><span class="mute">Safety</span>
+   <label style="display:flex;align-items:center;gap:10px;min-height:44px"><input type="checkbox" id="camstop" checked style="width:20px;height:20px;accent-color:var(--blue)">Stop if the camera goes quiet, 0.8 s</label>
+   <span class="small mute" style="line-height:1.5">After 3 errors in a row the wheels also stop (always on).</span></div>
+  <div class="ctl"><span class="mute">Arena</span>
+   <span class="small" id="arenaInfo" style="line-height:1.5">-</span>
+   <span class="small mute" style="margin-top:auto;line-height:1.5">To make or redo it, close this program and run scan_arena.py (automatic) or mark_arena.py (by hand), with the arena clear of robots.</span></div>
+  <div class="ctl"><span class="mute">Manual drive (Manual mode only)</span>
+   <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%;max-width:300px">
+    <span></span><button class="btn drv" data-d="fwd" type="button" disabled>Forward</button><span></span>
+    <button class="btn drv" data-d="left" type="button" disabled>Left</button><button class="btn drv" data-d="stop" type="button" disabled>Stop</button><button class="btn drv" data-d="right" type="button" disabled>Right</button>
+    <span></span><button class="btn drv" data-d="back" type="button" disabled>Back</button><span></span>
+   </div>
+   <span class="small mute">Hold a button to drive; let go and the rover stops.</span></div>
+ </div>
+ <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);padding-top:12px">
+  <span class="small mute">Escape hatch: Ctrl+C in the terminal also stops the rover and quits.</span>
+  <button class="btn" id="bQuit" type="button">Quit program</button>
+ </div>
+</section>
+</div>
+
+<script>
+"use strict";
+const TOKEN = "__TOKEN__";
+const $ = (id) => document.getElementById(id);
+let S = null, camSel = "external", pickSlot = null, manualMode = false, lastOk = 0;
+
+function post(cmd) {
+  return fetch("/api/cmd", {method: "POST", headers: {"X-Token": TOKEN, "Content-Type": "application/json"}, body: JSON.stringify(cmd)})
+    .then((r) => r.json()).catch(() => ({error: "no answer"}));
+}
+const f1 = (v, d = 0) => (v === null || v === undefined || Number.isNaN(v)) ? "-" : Number(v).toFixed(d);
+const deg = (v) => (v === null || v === undefined) ? "-" : (v >= 0 ? "+" : "") + Math.round(v) + "°";
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+
+/* ---------- buttons ---------- */
+$("bStart").onclick = () => post({cmd: "start"});
+$("bPause").onclick = () => post({cmd: "pause"});
+$("bStop").onclick = () => post({cmd: "stop"});
+$("bConnect").onclick = () => post({cmd: "connect", id: parseInt($("rid").value, 10)});
+$("bQuit").onclick = () => { if ($("bQuit").dataset.sure === "1") post({cmd: "quit"}); else { $("bQuit").dataset.sure = "1"; $("bQuit").textContent = "Press again to quit"; setTimeout(() => { $("bQuit").dataset.sure = "0"; $("bQuit").textContent = "Quit program"; }, 3000); } };
+$("camExt").onclick = () => setCam("external");
+$("camOn").onclick = () => setCam("onboard");
+function setCam(c) { camSel = c; $("camExt").classList.toggle("on", c === "external"); $("camOn").classList.toggle("on", c === "onboard"); }
+$("mAuto").onclick = () => { manualMode = false; post({cmd: "mode", mode: "auto"}); };
+$("mMan").onclick = () => { manualMode = true; post({cmd: "mode", mode: "manual"}); };
+$("speed").oninput = () => { $("speedV").textContent = $("speed").value + " cm/s"; };
+$("speed").onchange = () => post({cmd: "speed", value: parseFloat($("speed").value)});
+$("fov").oninput = () => { $("fovV").textContent = $("fov").value + "°"; };
+$("fov").onchange = () => post({cmd: "fov", value: parseFloat($("fov").value)});
+$("camstop").onchange = () => post({cmd: "safety", camstop: $("camstop").checked});
+document.querySelectorAll(".drv").forEach((b) => {
+  const go = () => post({cmd: "drive", dir: b.dataset.d});
+  const halt = () => post({cmd: "drive", dir: "stop"});
+  b.addEventListener("pointerdown", (e) => { e.preventDefault(); go(); });
+  b.addEventListener("pointerup", halt); b.addEventListener("pointerleave", halt); b.addEventListener("pointercancel", halt);
+});
+$("video").addEventListener("click", (e) => {
+  if (!pickSlot) return;
+  const img = $("frame"), r = img.getBoundingClientRect(), iw = img.naturalWidth, ih = img.naturalHeight;
+  if (!iw) return;
+  const sc = Math.min(r.width / iw, r.height / ih), ox = (r.width - iw * sc) / 2, oy = (r.height - ih * sc) / 2;
+  const x = (e.clientX - r.left - ox) / sc / iw, y = (e.clientY - r.top - oy) / sc / ih;
+  if (x < 0 || x > 1 || y < 0 || y > 1) return;
+  post({cmd: "colour", slot: pickSlot, cam: camSel, x, y});
+  pickSlot = null; $("video").classList.remove("pick"); $("pickHint").hidden = true;
+});
+
+/* ---------- picture: one request at a time ---------- */
+function nextFrame() {
+  const img = $("frame");
+  const t = new Image();
+  t.onload = () => { img.src = t.src; img.hidden = false; $("noframe").hidden = true; setTimeout(nextFrame, 60); };
+  t.onerror = () => { setTimeout(nextFrame, 400); };
+  fetch("/frame.jpg?cam=" + camSel + "&t=" + Date.now()).then((r) => (r.status === 200 ? r.blob() : null)).then((b) => {
+    if (!b) { img.hidden = true; $("noframe").hidden = false; $("noframe").textContent = camSel === "onboard" ? "No onboard picture. Start follow.py with --onboard to use the rover's own camera." : "Waiting for the first camera picture..."; setTimeout(nextFrame, 400); return; }
+    t.src = URL.createObjectURL(b);
+  }).catch(() => setTimeout(nextFrame, 600));
+}
+
+/* ---------- state ---------- */
+function poll() {
+  fetch("/api/state").then((r) => r.json()).then((s) => { S = s; lastOk = Date.now(); render(s); }).catch(() => { $("subtitle").textContent = "Lost contact with the program (is follow.py still running?)"; })
+    .finally(() => setTimeout(poll, 150));
+}
+
+function chip(label, value, cls) { return '<span class="chip"><span class="dot ' + cls + '"></span><span class="mute">' + esc(label) + '</span><span class="mono">' + esc(value) + "</span></span>"; }
+
+function render(s) {
+  $("subtitle").textContent = s.tandem ? "Both cameras: external is primary, the rover's own camera sharpens the aim" : "External camera and rear lidar";
+  const r = s.rover, c = s.chips;
+  const rs = {connected: ["Connected", "ok"], connecting: ["Connecting...", "wait"], failed: ["Failed", "bad"], countdown: ["Connecting in " + Math.ceil(r.countdown) + " s", "wait"], idle: ["Not connected", "bad"]}[r.state] || ["-", ""];
+  let h = chip("Rover " + r.id, rs[0], rs[1]);
+  h += chip("External camera", c.external.alive ? f1(c.external.fps) + " fps" : "no picture", c.external.alive ? "ok" : "bad");
+  h += chip("Lidar", c.lidar ? (c.lidar.alive ? f1(c.lidar.hz) + " Hz" : "no data") : "off", c.lidar ? (c.lidar.alive ? "ok" : "bad") : "");
+  if (c.onboard) h += chip("Onboard video", c.onboard.alive ? f1(c.onboard.fps) + " fps" : "no picture", c.onboard.alive ? "ok" : "bad");
+  $("chips").innerHTML = h;
+  if (document.activeElement !== $("rid") && String($("rid").value) !== String(r.id) && !$("rid").dataset.touched) $("rid").value = r.id;
+  $("rid").oninput = () => { $("rid").dataset.touched = "1"; };
+  $("bConnect").disabled = r.state === "connecting" || r.state === "connected";
+  $("bConnect").textContent = r.state === "failed" ? "Retry" : "Connect";
+
+  const run = s.run, on = r.state === "connected";
+  const labels = {ready: "Ready: press START", running: "Running", paused: "Paused", stopped: "Stopped", done: "All opponents popped", waiting: "Waiting for the rover"};
+  $("stText").textContent = labels[run.state] || run.state;
+  $("stDot").className = "dot " + ({running: "ok", paused: "wait", ready: "wait", stopped: "bad", done: "ok"}[run.state] || "");
+  const modeTxt = (run.mode || "-").toUpperCase();
+  $("modePill").textContent = modeTxt;
+  $("modePill").style.background = {evade: "#c8323a", escape: "#c8323a", tape: "#c8323a", defend: "#e0a030", chase: "#2f6fbf"}[run.mode] || "#344154";
+  $("modePill").style.color = ["defend"].includes(run.mode) ? "#1a1204" : "#fff";
+  $("bStart").disabled = !on || run.state === "running" || run.state === "done";
+  $("bPause").disabled = !on || run.state === "ready" || run.state === "stopped" || run.state === "done";
+  $("bPause").textContent = run.state === "paused" ? "RESUME" : "PAUSE";
+  $("bStop").disabled = !on || run.state === "stopped" || run.state === "ready";
+  manualMode = run.manual;
+  $("mAuto").classList.toggle("on", !run.manual); $("mMan").classList.toggle("on", run.manual);
+  document.querySelectorAll(".drv").forEach((b) => { b.disabled = !(run.manual && on && run.state === "running"); });
+  $("camOn").style.display = c.onboard ? "" : "none";
+  if (!c.onboard && camSel === "onboard") setCam("external");
+
+  /* camera overlays */
+  const pl = s.plan;
+  $("tgtChip").innerHTML = pl && pl.target ? '<span class="dot" style="width:10px;height:10px;background:' + (s.colours[pl.target] || "#5aa9ff") + '"></span> ' + esc(pl.target) + " &middot; " + esc(pl.pref) : "none";
+  $("yawBig").textContent = deg(s.yaw);
+  $("wpYaw").textContent = pl && pl.yaw_wp !== null ? deg(pl.yaw_wp) : "-";
+  if (s.behind) { $("behind").hidden = false; $("behind").textContent = s.behind + " is behind you: not in this view"; } else $("behind").hidden = true;
+  $("camInfo").textContent = camSel === "external" ? "External camera" + (c.external.alive ? " · " + f1(c.external.fps) + " fps" : "") + " · FOV " + f1(s.settings.fov) + "°" : "Onboard camera" + (c.onboard && c.onboard.alive ? " · " + f1(c.onboard.fps) + " fps" : "");
+
+  renderMap(s);
+  renderInfo(s);
+  renderLidar(s);
+  renderTiming(s);
+  renderSlots(s);
+  renderLog(s);
+  $("arenaInfo").textContent = s.arena ? s.arena.summary : "No arena.json yet: the route planning is off and yaw points straight at the nearest opponent.";
+  if (document.activeElement !== $("speed")) { $("speed").value = s.settings.speed; $("speedV").textContent = Math.round(s.settings.speed) + " cm/s"; }
+  if (document.activeElement !== $("fov")) { $("fov").value = s.settings.fov; $("fovV").textContent = Math.round(s.settings.fov) + "°"; }
+  $("camstop").checked = s.settings.camstop;
+}
+
+/* ---------- map ---------- */
+function renderMap(s) {
+  const el = $("map"), A = s.arena;
+  if (!A) { el.innerHTML = '<text x="200" y="180" text-anchor="middle" fill="#a3b0c0" font-size="13" font-family="IBM Plex Mono, monospace">no arena.json yet</text>'; return; }
+  const xs = A.poly.map((p) => p[0]), ys = A.poly.map((p) => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const sc = Math.min(340 / (x1 - x0), 300 / (y1 - y0)), ox = 200 - (x1 - x0) * sc / 2, oy = 190 - (y1 - y0) * sc / 2;
+  const X = (x) => ox + (x - x0) * sc, Y = (y) => oy + (y1 - y) * sc;
+  const P = (pts) => pts.map((p) => X(p[0]).toFixed(1) + "," + Y(p[1]).toFixed(1)).join(" ");
+  let g = '<defs><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="#ff9d92" stroke-width="1.5" stroke-opacity="0.55"/></pattern></defs>';
+  g += '<polygon points="' + P(A.poly) + '" fill="#141b24" stroke="#d7373f" stroke-width="6"/><polygon points="' + P(A.poly) + '" fill="none" stroke="#000" stroke-width="6" stroke-dasharray="14 14"/>';
+  if (A.keepout) g += '<polygon points="' + P(A.keepout) + '" fill="none" stroke="#8c8cc0" stroke-width="1" stroke-dasharray="2 4"/>';
+  if (A.nogo) {
+    g += '<polygon points="' + P(A.nogo) + '" fill="url(#hatch)" stroke="#ff9d92" stroke-width="1.5" stroke-dasharray="5 3"/>';
+    const cx = A.nogo.reduce((a, p) => a + p[0], 0) / A.nogo.length, cy = A.nogo.reduce((a, p) => a + p[1], 0) / A.nogo.length;
+    g += '<text x="' + X(cx) + '" y="' + (Y(cy) + 4) + '" text-anchor="middle" fill="#ffd3cd" stroke="#141b24" stroke-width="3" paint-order="stroke" font-size="11" font-family="IBM Plex Mono, monospace">no-go</text>';
+  }
+  const pl = s.plan, F = s.follower;
+  if (pl && pl.path && pl.path.length > 1) {
+    g += '<polyline points="' + P(pl.path) + '" fill="none" stroke="#8fb8ff" stroke-width="2.5" stroke-linejoin="round"/>';
+    if (pl.waypoint) g += '<circle cx="' + X(pl.waypoint[0]) + '" cy="' + Y(pl.waypoint[1]) + '" r="4" fill="#0e1217" stroke="#8fb8ff" stroke-width="2"/>';
+    if (pl.goal) { const gx = X(pl.goal[0]), gy = Y(pl.goal[1]); g += '<line x1="' + (gx - 6) + '" y1="' + (gy - 6) + '" x2="' + (gx + 6) + '" y2="' + (gy + 6) + '" stroke="#8fb8ff" stroke-width="2.5"/><line x1="' + (gx + 6) + '" y1="' + (gy - 6) + '" x2="' + (gx - 6) + '" y2="' + (gy + 6) + '" stroke="#8fb8ff" stroke-width="2.5"/>'; }
+  }
+  const T = s.threat;
+  for (const [n, o] of Object.entries(s.opps)) {
+    if (!o.seen) continue;
+    const col = s.colours[n] || "#e8edf4", cx = X(o.x), cy = Y(o.y), isT = pl && pl.target === n, chaser = T && T.active && T.who === n;
+    if (chaser) g += '<circle cx="' + cx + '" cy="' + cy + '" r="14" fill="none" stroke="#ff6b5b" stroke-width="2"/>';
+    else if (isT) g += '<circle cx="' + cx + '" cy="' + cy + '" r="15" fill="none" stroke="' + col + '" stroke-width="2"/>';
+    g += '<circle cx="' + cx + '" cy="' + cy + '" r="8" fill="' + col + '"/><text x="' + (cx + 14) + '" y="' + (cy - 8) + '" fill="#e8edf4" font-size="13" font-family="IBM Plex Mono, monospace">' + n + (isT ? " target" : "") + "</text>";
+    if (chaser && F) g += '<line x1="' + cx + '" y1="' + cy + '" x2="' + X(F.x) + '" y2="' + Y(F.y) + '" stroke="#ff6b5b" stroke-width="2.5"/>';
+  }
+  if (F) {
+    const a = -F.yaw;      /* screen y is flipped */
+    g += '<g transform="translate(' + X(F.x) + " " + Y(F.y) + ") rotate(" + a + ')">';
+    if (s.lidar) g += '<path d="M-14 0 L-91.9 45 A90 90 0 0 1 -91.9 -45 Z" fill="#3ecf9e" fill-opacity="0.16" stroke="#3ecf9e" stroke-width="1"/>';
+    g += '<rect x="-14" y="-11" width="28" height="22" rx="4" fill="#e8edf4"/><path d="M4 -6 L12 0 L4 6 Z" fill="#0e1217"/></g>';
+  }
+  el.innerHTML = g;
+}
+
+function renderInfo(s) {
+  const pl = s.plan, T = s.threat;
+  const cell = (k, v, col) => '<div class="cell2"><span class="small mute">' + k + '</span><span class="mono" style="font-size:13px;' + (col ? "color:" + col : "") + '">' + v + "</span></div>";
+  $("mapInfo").innerHTML = cell("Target", pl && pl.target ? esc(pl.target) + " &middot; " + esc(pl.pref) : "none") + cell("Next waypoint yaw", pl && pl.yaw_wp !== null ? deg(pl.yaw_wp) : "-", "#8fb8ff")
+    + cell("Straight line to target", pl ? (pl.blocked ? "blocked by no-go" : "clear") : "-") + cell("Route", pl && pl.path ? (pl.path.length - 1) + " legs" : "-");
+  const bars = [];
+  if (s.ir) { bars.push(["IR left", s.ir.left, s.ir.age]); bars.push(["IR right", s.ir.right, s.ir.age]); }
+  $("bars").innerHTML = bars.length ? bars.map((b) => '<div style="display:flex;flex-direction:column;gap:4px"><div class="kv"><span class="mute">' + b[0] + ' (last read ' + f1(b[2], 0) + ' s ago)</span><span class="mono">' + f1(b[1]) + ' cm</span></div><div class="bar"><div style="width:' + Math.min(100, b[1]) + "%;background:" + (b[1] < 20 ? "#f2b84b" : "#3ecf9e") + '"></div></div></div>').join("") : '<span class="small mute">The side IR sensors are read when the rover needs to pick a turning side, so they show after the first evasion.</span>';
+  const fl = s.floor, nm = ["Floor left", "Floor middle", "Floor right"];
+  $("floor").innerHTML = fl ? fl.map((v, i) => cell(nm[i], v ? "TAPE" : "floor", v ? "#ff6b5b" : "")).join("") : '<div class="cell2" style="grid-column:1/-1"><span class="small mute">Floor colour sensors are off. Start follow.py with --floor-sensors to use them as a tape detector.</span></div>';
+}
+
+function renderLidar(s) {
+  const L = s.lidar, el = $("lid");
+  if (!L) { el.style.gridTemplateColumns = "1fr"; el.innerHTML = '<div style="color:#a3b0c0">Lidar is off (--no-lidar)</div>'; $("lidNear").textContent = "-"; $("lidHz").textContent = "-"; $("lidTitle").textContent = "Rear lidar"; return; }
+  $("lidTitle").textContent = "Rear lidar, " + L.n + "×" + L.n;
+  el.style.gridTemplateColumns = "repeat(" + L.n + ",minmax(0,1fr))";
+  el.innerHTML = L.cells.map((v, i) => {
+    let bg = "#141b24", fg = "#a3b0c0", t = "-", bs = "solid";
+    if (L.mask[i]) { t = "masked"; bs = "dashed"; }
+    else if (v !== null) { t = String(Math.round(v)); if (v <= 150) { bg = "#c8323a"; fg = "#fff"; } else if (v <= 450) { bg = "#e0a030"; fg = "#1a1204"; } else { bg = "#3f6aa0"; fg = "#fff"; } }
+    return '<div style="background:' + bg + ";color:" + fg + ";border-style:" + bs + (L.n > 4 ? ";font-size:10px;min-height:28px" : "") + '">' + t + "</div>";
+  }).join("");
+  $("lidNear").textContent = L.nearest_mm === null ? "nothing in range" : Math.round(L.nearest_mm) + " mm";
+  $("lidHz").textContent = f1(L.hz, 1) + " Hz";
+}
+
+function renderTiming(s) {
+  const t = s.timing, T = s.threat, kv = (k, v, b) => '<div class="kv"' + (b ? ' style="border-top:1px solid #2b3542;padding-top:10px"' : "") + '><span class="' + (b ? "" : "mute") + '">' + k + '</span><span class="mono"' + (b ? ' style="font-weight:500"' : "") + ">" + v + "</span></div>";
+  $("timing").innerHTML = kv("Pin reach, external camera", f1(t.pin_ext_m, 2) + " m") + kv("Pin reach, rear lidar", f1(t.pin_lidar_mm) + " mm") + kv("Camera and network delay", f1(t.delay_s, 2) + " s")
+    + kv("Spin " + (T.active && T.turn !== null ? Math.abs(Math.round(T.turn)) : 180) + "° at " + f1(t.speed) + " cm/s", f1(t.spin_s, 2) + " s") + kv("Safety margin", f1(t.margin_s, 2) + " s")
+    + kv("Warning needed", f1(t.need_s, 2) + " s", true);
+  const b = $("evadeBanner");
+  if (T.active) { b.className = "banner hot"; b.textContent = "Chaser" + (T.who ? " " + T.who : "") + " (" + (T.source || "?") + "): " + (T.turn !== null ? "turning " + deg(T.turn) : "offset " + deg(T.offset)) + (T.min_mm ? ", " + Math.round(T.min_mm) + " mm" : ""); }
+  else { b.className = "banner"; b.textContent = "No chaser."; }
+}
+
+function renderSlots(s) {
+  $("slots").innerHTML = Object.entries(s.slots).map(([n, d]) => '<div class="slot"><span class="sw" style="background:' + d.swatch + '"></span><div style="flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-weight:600">Slot ' + n + ' <span class="mono mute small" style="font-weight:400">' + esc(d.hue) + '</span></span><span class="small mute">' + esc(d.status) + '</span></div><button class="btn' + (pickSlot === n ? " on" : "") + '" data-slot="' + n + '" type="button" style="font-size:13px">' + (pickSlot === n ? "Click the balloon" : "Set colour") + "</button></div>").join("");
+  $("slots").querySelectorAll("button").forEach((b) => { b.onclick = () => { pickSlot = pickSlot === b.dataset.slot ? null : b.dataset.slot; $("video").classList.toggle("pick", !!pickSlot); $("pickHint").hidden = !pickSlot; if (pickSlot && camSel === "onboard") $("pickHint").textContent = "Click the balloon in the onboard picture to set its colour (this sets the colour for that camera only)."; renderSlots(S); }; });
+  const pref = s.plan ? s.plan.pref : "nearest";
+  $("targets").innerHTML = ["nearest", "A", "B", "C"].map((n) => '<button class="btn' + (pref === n ? " on" : "") + '" data-t="' + n + '" type="button">' + (n === "nearest" ? "Nearest" : n) + "</button>").join("");
+  $("targets").querySelectorAll("button").forEach((b) => { b.onclick = () => post({cmd: "target", name: b.dataset.t}); });
+}
+
+function renderLog(s) {
+  const col = {INFO: ["#344154", "#e8edf4"], CHASE: ["#2f6fbf", "#fff"], EVADE: ["#c8323a", "#fff"], PLAN: ["#344154", "#e8edf4"], WARN: ["#e0a030", "#1a1204"], ERROR: ["#c8323a", "#fff"], ROVER: ["#1d7f5e", "#fff"]};
+  $("log").innerHTML = s.log.slice().reverse().slice(0, 12).map((l) => { const c = col[l.tag] || col.INFO; return '<div class="logrow"><span class="mono mute" style="flex:0 0 64px">' + esc(l.time) + '</span><span class="tag" style="background:' + c[0] + ";color:" + c[1] + '">' + esc(l.tag) + '</span><span style="flex:1 1 auto;min-width:0">' + esc(l.msg) + "</span></div>"; }).join("") || '<span class="small mute">Nothing yet.</span>';
+}
+
+poll(); nextFrame();
+</script>
+</body>
+</html>

@@ -82,6 +82,12 @@ full-render scenarios); `python simulate.py hunter` (video in `sim_output/`).
   targeting study was re-run after the fix and NO method beat another (docs/EXPERIMENTS.md); results quoted elsewhere that were produced before
   the fix (the 16-seed full-render `hunter` numbers in section 6) may shift and need re-measuring.
 
+## 5a. The dashboard is the real interface
+`dashboard.py` (stdlib HTTP server, 127.0.0.1, per-run token on every POST) + `dashboard.html` (the mock-up layout, live). `follow.py --camera N` starts it,
+runs `tracker.main(headless=True, on_frame=...)`, and the rover waits for START. `follow.py` builds `snapshot()` / `command()`; `evade.Brain` gained
+`manual`, `threat_now`, `safety_camera_stop`; `plan.Planner.set_preference`. `--window` keeps the OpenCV window. Tested with a fake rover and a fake
+tracker (`tests/test_follow.py`), and the page was rendered at desktop and phone width; never run with the real camera or rover.
+
 ## 5b. Tandem mode (external + onboard camera)
 `follow.py --camera N --onboard SRC|bridge`. `onboard.MultiTracker` (bearing+range per slot) -> `OnboardFeed` thread -> `Pipeline.on_onboard` -> `evade.Brain`
 (onboard bearing replaces the external `turn_deg` for the threat; carries the facing for <=2 s when the external camera lost us). Fast sim, hunter:

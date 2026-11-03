@@ -23,11 +23,28 @@ CONNECT_DELAY = 0.0
 KEYS = []                      # scripted key presses [(seconds, key)] and the status lines seen
 STATUS = []
 follow.AUTO_CONNECT_S = 0.0
+follow.OPEN_BROWSER = False
 
 
-def run_follow(argv, states_fn=None, esp32_fn=None, secs=2.5, arena=True, drive=False):
+LAST_EVENTS = []
+
+
+class FakeTr:
+    fov_deg = 70.0
+    opp_hsv = {"A": [((100, 120, 60), (130, 255, 255))], "B": [((40, 100, 60), (80, 255, 255))], "C": [((20, 120, 100), (35, 255, 255))]}
+    colour_calls, fov_calls = [], []
+    def set_opponent_color(self, n, h, s_, v): self.colour_calls.append((n, int(h)))
+    def set_fov(self, f): self.fov_calls.append(f); self.fov_deg = f
+    def lock_floor(self, cap): return True
+
+
+SIDE_TASK = None
+
+
+def run_follow(argv, states_fn=None, esp32_fn=None, secs=2.5, arena=True, drive=False, window=True):
     """One run of follow.main with everything fake. Returns what happened."""
     events, chase_yaws, drawn = [], [], []
+    LAST_EVENTS[:] = [events]
     if arena: json.dump(ARENA, open("arena.json", "w"))
     elif os.path.exists("arena.json"): os.remove("arena.json")
 
@@ -47,7 +64,7 @@ def run_follow(argv, states_fn=None, esp32_fn=None, secs=2.5, arena=True, drive=
     follow.stop.clear(); follow.yaw_to_leader = follow.yaw_to_target = None
     evade.set_max_speed(30)
 
-    def vision_main(camera, flip, on_yaw=None, on_state=None, on_draw=None, on_key=None, status=None):
+    def vision_main(camera, flip, on_yaw=None, on_state=None, on_draw=None, on_key=None, status=None, **kw):
         events.append(("window",))
         t0 = time.time()
         todo = sorted(KEYS)
@@ -59,6 +76,11 @@ def run_follow(argv, states_fn=None, esp32_fn=None, secs=2.5, arena=True, drive=
             st = states_fn(t) if states_fn else {"follower": {"x": 0.3, "y": 0.55, "yaw": 0.0, "age": 0}, "A": {"x": 0.9, "y": 0.55, "age": 0}}
             if on_yaw: on_yaw(0.0)
             if on_state: on_state(st)
+            if kw.get('on_tick'): kw['on_tick'](FakeTr(), None)
+            if kw.get('on_frame'):
+                import numpy as _np
+                img = _np.zeros((480, 640, 3), _np.uint8); img[:, :] = (30, 60, 200)
+                kw['on_frame'](img, img.copy(), FakeTr(), st)
             if on_draw: drawn.append(1)
             time.sleep(1 / 30)
     fake_tracker = types.ModuleType("tracker"); fake_tracker.main = vision_main
@@ -72,7 +94,8 @@ def run_follow(argv, states_fn=None, esp32_fn=None, secs=2.5, arena=True, drive=
                 tx.sendto(lidar_rx.make_packet(seq, int((time.time() - t0) * 1000), esp32_fn(time.time() - t0).ravel()), ("127.0.0.1", port))
                 seq += 1; time.sleep(1 / 30)
         threading.Thread(target=esp32, daemon=True).start()
-    follow.main(argv)
+    if SIDE_TASK is not None: threading.Thread(target=SIDE_TASK, daemon=True).start()
+    follow.main(argv + (['--window'] if window else []))
     return events, chase_yaws, drawn
 
 # 1. planning ON: the target is across the no-go square
@@ -174,6 +197,80 @@ ev_id, _, _ = run_follow(["--camera", "0"], secs=2.0)
 follow.AUTO_CONNECT_S = 0.0; KEYS.clear()
 check("rover ID typed in the window (R, 4, 2, Enter) connects to rover 42", ("connect", 42) in ev_id, str([e for e in ev_id if e[0] == "connect"]))
 check("the window shows the ID prompt while typing", any("ROVER ID: 42_" in x for x in STATUS), str(STATUS[:3]))
+
+
+# ---- the browser dashboard
+import re
+import urllib.request, urllib.error
+DPORT = 8900 + int(time.time()) % 90
+dres = {}
+
+def http(path, data=None, token=None):
+    req = urllib.request.Request(f"http://127.0.0.1:{DPORT}{path}", data=json.dumps(data).encode() if data is not None else None,
+                                 headers={"X-Token": token} if token else {})
+    try:
+        with urllib.request.urlopen(req, timeout=3) as r:
+            return r.status, r.read()
+    except urllib.error.HTTPError as e:
+        return e.code, e.read()
+
+def side():
+    try:
+        for _ in range(60):                                   # wait for the server
+            try: code, page = http("/"); break
+            except Exception: time.sleep(0.1)
+        tok = re.search(rb'TOKEN = "(\w+)"', page).group(1).decode()
+        dres["page"] = (code, b"Rover control" in page, tok != "__TOKEN__")
+        dres["no_token"] = http("/api/cmd", {"cmd": "start"})[0]
+        dres["bad_token"] = http("/api/cmd", {"cmd": "start"}, "nope")[0]
+        for _ in range(40):                                   # until the (fake) rover is connected
+            st = json.loads(http("/api/state")[1])
+            if st["rover"]["state"] == "connected": break
+            time.sleep(0.1)
+        dres["ready"] = (st["rover"]["state"], st["run"]["state"])
+        n_before = len([e for e in dres_events() if e[0] == "write"])
+        time.sleep(0.4)
+        dres["idle_writes"] = len([e for e in dres_events() if e[0] == "write"]) - n_before          # nothing drives before START
+        http("/api/cmd", {"cmd": "start"}, tok); time.sleep(0.5)
+        st = json.loads(http("/api/state")[1]); dres["running"] = st["run"]["state"]
+        dres["state_bits"] = (st["follower"] is not None, "A" in st["opps"], st["plan"] is not None and st["plan"]["pref"], st["arena"] is not None, len(st["slots"]))
+        http("/api/cmd", {"cmd": "target", "name": "B"}, tok); time.sleep(0.3)
+        dres["target"] = json.loads(http("/api/state")[1])["plan"]["pref"]
+        http("/api/cmd", {"cmd": "pause"}, tok); time.sleep(0.3)
+        dres["paused"] = json.loads(http("/api/state")[1])["run"]["state"]
+        http("/api/cmd", {"cmd": "pause"}, tok); time.sleep(0.2)
+        http("/api/cmd", {"cmd": "speed", "value": 18}, tok); http("/api/cmd", {"cmd": "fov", "value": 80}, tok)
+        http("/api/cmd", {"cmd": "colour", "slot": "B", "cam": "external", "x": 0.5, "y": 0.5}, tok)
+        http("/api/cmd", {"cmd": "safety", "camstop": False}, tok)
+        time.sleep(0.4)
+        st = json.loads(http("/api/state")[1]); dres["settings"] = (st["settings"]["speed"], st["settings"]["camstop"], FakeTr.fov_calls[-1:] , FakeTr.colour_calls[-1:])
+        code, jpg = http("/frame.jpg?cam=external"); dres["jpg"] = (code, jpg[:2] == b"\xff\xd8")
+        http("/api/cmd", {"cmd": "mode", "mode": "manual"}, tok); http("/api/cmd", {"cmd": "drive", "dir": "fwd"}, tok); time.sleep(0.4)
+        dres["manual_writes"] = [e for e in dres_events() if e[0] == "write" and e[1:] == (15, 15)][:1]
+        http("/api/cmd", {"cmd": "drive", "dir": "stop"}, tok)
+        http("/api/cmd", {"cmd": "stop"}, tok); time.sleep(0.3)
+        dres["stopped"] = json.loads(http("/api/state")[1])["run"]["state"]
+        dres["log_tags"] = {l["tag"] for l in json.loads(http("/api/state")[1])["log"]}
+    except Exception as e:
+        dres["error"] = repr(e)
+
+def dres_events(): return list(LAST_EVENTS[0]) if LAST_EVENTS else []
+
+
+SIDE_TASK = side
+follow.OPEN_BROWSER = False
+run_follow(["--camera", "0", "--port", str(DPORT)], secs=7.0, drive=True, window=False)
+SIDE_TASK = None
+check("dashboard: the page is served with a token filled in", dres.get("page") == (200, True, True), str(dres.get("page") or dres.get("error")))
+check("dashboard: a command without the token, or with a wrong one, is refused (403)", dres.get("no_token") == 403 and dres.get("bad_token") == 403, str((dres.get("no_token"), dres.get("bad_token"))))
+check("dashboard: the rover connects but stands still until START", dres.get("ready") == ("connected", "ready") and dres.get("idle_writes") == 0, str((dres.get("ready"), dres.get("idle_writes"))))
+check("dashboard: START runs the chase; the state has follower, opponents, plan, arena and slots", dres.get("running") == "running" and dres.get("state_bits") == (True, True, "nearest", True, 3), str((dres.get("running"), dres.get("state_bits"))))
+check("dashboard: target button, PAUSE and RESUME", dres.get("target") == "B" and dres.get("paused") == "paused", str((dres.get("target"), dres.get("paused"))))
+check("dashboard: speed, field of view, colour click and the camera fail-safe switch are applied",
+      dres.get("settings") == (18.0, False, [80.0], [("B", 112)]) or (dres.get("settings") and dres["settings"][0] == 18.0 and dres["settings"][1] is False and dres["settings"][2] == [80.0] and dres["settings"][3]), str(dres.get("settings")))
+check("dashboard: the camera picture is a JPEG", dres.get("jpg") == (200, True), str(dres.get("jpg")))
+check("dashboard: manual drive writes the wheel speeds, STOP stops", bool(dres.get("manual_writes")) and dres.get("stopped") == "stopped", str((dres.get("manual_writes"), dres.get("stopped"))))
+check("dashboard: events reach the log", {"ROVER", "INFO"} <= (dres.get("log_tags") or set()), str(dres.get("log_tags")))
 
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r in results if r[1]), len(results)))
 for r in results:

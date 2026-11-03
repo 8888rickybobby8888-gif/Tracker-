@@ -362,6 +362,12 @@ class Planner:
             self._target = name
             self._best_d, self._best_t = None, None
 
+    def set_preference(self, name):
+        """The dashboard's chase-target buttons: \"nearest\" or an opponent name."""
+        self.target_pref = name if name in ("nearest", "A", "B", "C") else "nearest"
+        self._target = None
+        self._best_d, self._best_t = None, None
+
     # ---- main entry -----------------------------------------------------------------------
     def update(self, state, now):
         self._now = now
