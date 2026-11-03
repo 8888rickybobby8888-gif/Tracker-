@@ -119,3 +119,20 @@ marker's known horizontal plane instead: 20.6 / 20.6 / 20.3 / 20.3 deg, and the 
 out of frame): keep the floor marker well in view, camera well above the floor.
 Full-render `hunter`, 16 seeds, plane vs old heading: 2 wins / 9 pops / 5 time-outs / 1 run with a line crossing, against 3 / 7 / 6 / 0. That
 difference is inside the noise of this scenario, so the fix is kept for the bug it removes, not for the fight.
+
+## Onboard camera in the CHASE yaw (`evade.USE_ONBOARD_CHASE`)
+The onboard bearing to the target's balloon (within 0.6 m, within 50 deg of straight ahead, route not blocked) is blended 80/20 into the yaw
+that `chase()` gets. Fast simulator, onboard camera at 15 fps / 0.12 s, 48 seeds x 5 scenarios:
+
+| | wins | survived | tape frames |
+|---|---|---|---|
+| off | 172/240 | 231 | 20 |
+| on | 173/240 | 229 | 29 |
+
+Per scenario (wins, on against off): three_calm 21 against 16, hunter 24 against 29, wanderer 33 against 37, start_beside_nogo 47 against 42. No net
+gain and slightly more line frames, so it is OFF by default. It is a toggle in the dashboard's Experiments panel.
+
+## Experiments panel
+`experiments.py` lists 13 options (onboard in the defence, onboard in the chase, heading from the floor plane, line first, drive away from the line,
+keep facing, retarget, edge nudge, back off, sidestep, hold ground, route round moving opponents, target mode). The dashboard switches them live
+(`command: experiment`), marks the ones changed from the default, and has Reset all. Each shows what the simulator measured.

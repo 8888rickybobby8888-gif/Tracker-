@@ -724,6 +724,29 @@ check("camera moved, rover static: the heading from the flat marker stays within
 check("... and the old solvePnP heading was off by more than 10 deg from at least one of them (so this test would catch a regression)",
       max(abs(y - 20.0) for y in _y_old) > 10.0, str([round(y, 1) for y in _y_old]))
 
+
+# ---- experiments registry (the dashboard's toggles)
+import experiments as _xp
+_xp.reset()
+_d0 = (ev.BACKOFF_SPEED, ev.USE_ONBOARD_CHASE, pl.TARGET_MODE)
+check("experiments: a 'value' experiment switches between its tried value and 0", (_xp.set_value("backoff", True) is True and ev.BACKOFF_SPEED == 28
+      and _xp.set_value("backoff", False) is False and ev.BACKOFF_SPEED == 0), str(ev.BACKOFF_SPEED))
+check("experiments: a 'bool' experiment flips the module setting the code reads", (_xp.set_value("onboard_chase", False) is False and ev.USE_ONBOARD_CHASE is False), "")
+check("experiments: the target mode accepts a listed choice", _xp.set_value("target_mode", "kite") == "kite" and pl.TARGET_MODE == "kite", "")
+try:
+    _xp.set_value("target_mode", "nonsense"); _bad_choice = False
+except ValueError:
+    _bad_choice = True
+try:
+    _xp.set_value("no-such-experiment", True); _bad_id = False
+except KeyError:
+    _bad_id = True
+check("experiments: a bad choice or an unknown id is refused", _bad_choice and _bad_id, "")
+_snap_x = _xp.snapshot()
+check("experiments: the snapshot lists every option with a changed flag source", len(_snap_x) == len(_xp.EXPERIMENTS) and any(e["value"] != e["default"] for e in _snap_x), str(len(_snap_x)))
+_xp.reset()
+check("experiments: reset puts every setting back to what the program started with", (ev.BACKOFF_SPEED, ev.USE_ONBOARD_CHASE, pl.TARGET_MODE) == _d0, str((ev.BACKOFF_SPEED, ev.USE_ONBOARD_CHASE, pl.TARGET_MODE)))
+
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]
 for r_ in failed:

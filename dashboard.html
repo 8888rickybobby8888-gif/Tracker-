@@ -60,6 +60,13 @@ input[type=number],input[type=text]{min-height:44px;width:84px;padding:0 10px;ba
 .sw{flex:0 0 28px;width:28px;height:28px;border-radius:50%}
 .banner{padding:10px 12px;background:var(--bg);border:1px solid var(--line);border-radius:8px;font-size:13px}
 .banner.hot{border-color:var(--coral);color:var(--coral2)}
+.exp{display:flex;flex-direction:column;gap:6px;padding:12px 14px;background:var(--bg);border:1px solid var(--line);border-radius:8px;min-width:0}
+.exp.changed{border-color:var(--amber)}
+.exp label.tg{display:flex;align-items:center;gap:10px;min-height:32px;font-weight:600;cursor:pointer}
+.exp input[type=checkbox]{width:20px;height:20px;accent-color:var(--blue);flex:0 0 auto}
+.exp select{min-height:40px;background:var(--panel);color:var(--ink);border:1px solid var(--btn2line);border-radius:8px;padding:0 10px;font-family:var(--mono);font-size:13px}
+.exp .note{font-size:12px;color:var(--mute);line-height:1.5}.exp .res{font-size:12px;line-height:1.5;color:var(--ink)}
+.tagch{font-size:11px;font-weight:600;letter-spacing:.06em;padding:1px 6px;border-radius:4px;background:var(--amber);color:#1a1204}
 @media (prefers-reduced-motion:no-preference){.btn,.big{transition:filter .12s}.btn:hover,.big:hover:not(:disabled){filter:brightness(1.15)}}
 </style>
 </head>
@@ -185,6 +192,15 @@ input[type=number],input[type=text]{min-height:44px;width:84px;padding:0 10px;ba
   <button class="btn" id="bQuit" type="button">Quit program</button>
  </div>
 </section>
+
+<section class="panel" id="expPanel">
+ <div class="row" style="justify-content:space-between">
+  <h2>Experiments</h2>
+  <button class="btn" id="expReset" type="button">Reset all to defaults</button>
+ </div>
+ <p class="small mute" style="margin:0;line-height:1.5">Every experimental option, switchable while the program runs. A change takes effect on the next step and is written to the event log. The results shown are from the simulator only; none of this was tried on the real rover. The defaults are what the simulator supported best.</p>
+ <div class="ctls" id="exps"></div>
+</section>
 </div>
 
 <script>
@@ -294,6 +310,7 @@ function render(s) {
   if (s.behind) { $("behind").hidden = false; $("behind").textContent = s.behind + " is behind you: not in this view"; } else $("behind").hidden = true;
   $("camInfo").textContent = camSel === "external" ? "External camera" + (c.external.alive ? " · " + f1(c.external.fps) + " fps" : "") + " · FOV " + f1(s.settings.fov) + "°" : "Onboard camera" + (c.onboard && c.onboard.alive ? " · " + f1(c.onboard.fps) + " fps" : "");
 
+  renderExperiments(s);
   renderMap(s);
   renderInfo(s);
   renderLidar(s);
@@ -305,6 +322,28 @@ function render(s) {
   if (document.activeElement !== $("fov")) { $("fov").value = s.settings.fov; $("fovV").textContent = Math.round(s.settings.fov) + "°"; }
   $("camstop").checked = s.settings.camstop;
 }
+
+/* ---------- experiments ---------- */
+let expSig = "";
+function renderExperiments(s) {
+  const list = s.experiments || [];
+  const sig = JSON.stringify(list.map((e) => [e.id, e.value]));
+  if (sig === expSig || (document.activeElement && document.activeElement.closest && document.activeElement.closest("#exps") && sig === expSig)) return;
+  expSig = sig;
+  $("exps").innerHTML = list.map((e) => {
+    const changed = e.value !== e.default;
+    const ctrl = e.kind === "choice"
+      ? '<select id="x_' + e.id + '" aria-label="' + esc(e.label) + '">' + e.choices.map((c) => '<option' + (c === e.value ? " selected" : "") + ">" + c + "</option>").join("") + "</select>"
+      : '<label class="tg"><input type="checkbox" id="x_' + e.id + '"' + (e.value ? " checked" : "") + ">" + esc(e.label) + "</label>";
+    return '<div class="exp' + (changed ? " changed" : "") + '">' + (e.kind === "choice" ? '<span style="font-weight:600">' + esc(e.label) + "</span>" : "") + ctrl
+      + (changed ? '<span><span class="tagch">CHANGED FROM DEFAULT</span></span>' : "") + '<span class="note">' + esc(e.desc) + '</span><span class="res">' + esc(e.note) + "</span></div>";
+  }).join("");
+  list.forEach((e) => {
+    const el = $("x_" + e.id);
+    el.onchange = () => post({cmd: "experiment", id: e.id, value: e.kind === "choice" ? el.value : el.checked});
+  });
+}
+$("expReset").onclick = () => post({cmd: "experiments_reset"});
 
 /* ---------- map ---------- */
 function renderMap(s) {

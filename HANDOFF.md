@@ -88,6 +88,8 @@ runs `tracker.main(headless=True, on_frame=...)`, and the rover waits for START.
 `manual`, `threat_now`, `safety_camera_stop`; `plan.Planner.set_preference`. `--window` keeps the OpenCV window. Tested with a fake rover and a fake
 tracker (`tests/test_follow.py`), and the page was rendered at desktop and phone width; never run with the real camera or rover.
 
+`experiments.py` = the registry behind the dashboard's Experiments panel. `evade.USE_ONBOARD_CHASE` (onboard bearing blended into the chase yaw) is OFF: 48-seed sim showed no net gain.
+
 ## 5b. Tandem mode (external + onboard camera)
 `follow.py --camera N --onboard SRC|bridge`. `onboard.MultiTracker` (bearing+range per slot) -> `OnboardFeed` thread -> `Pipeline.on_onboard` -> `evade.Brain`
 (onboard bearing replaces the external `turn_deg` for the threat; carries the facing for <=2 s when the external camera lost us). Fast sim, hunter:

@@ -146,6 +146,11 @@ ONBOARD_DELAY_S = 0.15    # how old an onboard reading is when it arrives (captu
 ONBOARD_SUSTAIN_S = 2.0   # keep facing an opponent the external camera has lost for this long, as long as our own camera still sees it close
 ONBOARD_CLOSE_M = 0.45    # ... and it is within this range of us
 ONBOARD_FRONT_DEG = 70    # ... and within this angle of straight ahead
+USE_ONBOARD_CHASE = False # ALSO for the CHASE yaw: when our own camera sees the TARGET's balloon this close and ahead, its bearing (exact, no marker or
+                          # heading needed) is blended into the yaw that chase() gets (the external camera still gives the route and the far field)
+ONBOARD_CHASE_M = 0.60    # ... within this range
+ONBOARD_CHASE_FRONT_DEG = 50   # ... and within this angle of straight ahead
+ONBOARD_CHASE_W = 0.8     # weight of the onboard bearing in the blend (the rest is the external camera's yaw)
 TAPE_BACKOFF_S = 0.5      # floor sensors: back off this long after one sees tape while we were driving forward
 TAPE_BACKOFF_SPEED = 18   # cm/s
 TAPE_FORWARD_MIN_CM_S = 3.0

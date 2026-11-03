@@ -225,6 +225,7 @@ def side():
         dres["bad_token"] = http("/api/cmd", {"cmd": "start"}, "nope")[0]
         for _ in range(40):                                   # until the (fake) rover is connected
             st = json.loads(http("/api/state")[1])
+            if "rover" not in st: dres["state_error"] = st; break
             if st["rover"]["state"] == "connected": break
             time.sleep(0.1)
         dres["ready"] = (st["rover"]["state"], st["run"]["state"])
@@ -248,6 +249,11 @@ def side():
         http("/api/cmd", {"cmd": "mode", "mode": "manual"}, tok); http("/api/cmd", {"cmd": "drive", "dir": "fwd"}, tok); time.sleep(0.4)
         dres["manual_writes"] = [e for e in dres_events() if e[0] == "write" and e[1:] == (15, 15)][:1]
         http("/api/cmd", {"cmd": "drive", "dir": "stop"}, tok)
+        http("/api/cmd", {"cmd": "experiment", "id": "backoff", "value": True}, tok); time.sleep(0.2)
+        xs = {e["id"]: e for e in json.loads(http("/api/state")[1])["experiments"]}
+        dres["exp_on"] = (xs["backoff"]["value"], follow.evade.BACKOFF_SPEED)
+        http("/api/cmd", {"cmd": "experiments_reset"}, tok); time.sleep(0.2)
+        dres["exp_reset"] = follow.evade.BACKOFF_SPEED
         http("/api/cmd", {"cmd": "stop"}, tok); time.sleep(0.3)
         dres["stopped"] = json.loads(http("/api/state")[1])["run"]["state"]
         dres["log_tags"] = {l["tag"] for l in json.loads(http("/api/state")[1])["log"]}
@@ -263,13 +269,14 @@ run_follow(["--camera", "0", "--port", str(DPORT)], secs=7.0, drive=True, window
 SIDE_TASK = None
 check("dashboard: the page is served with a token filled in", dres.get("page") == (200, True, True), str(dres.get("page") or dres.get("error")))
 check("dashboard: a command without the token, or with a wrong one, is refused (403)", dres.get("no_token") == 403 and dres.get("bad_token") == 403, str((dres.get("no_token"), dres.get("bad_token"))))
-check("dashboard: the rover connects but stands still until START", dres.get("ready") == ("connected", "ready") and dres.get("idle_writes") == 0, str((dres.get("ready"), dres.get("idle_writes"))))
+check("dashboard: the rover connects but stands still until START", dres.get("ready") == ("connected", "ready") and dres.get("idle_writes") == 0, str((dres.get("ready"), dres.get("idle_writes"), dres.get("error"), str(dres.get("state_error"))[:300])))
 check("dashboard: START runs the chase; the state has follower, opponents, plan, arena and slots", dres.get("running") == "running" and dres.get("state_bits") == (True, True, "nearest", True, 3), str((dres.get("running"), dres.get("state_bits"))))
 check("dashboard: target button, PAUSE and RESUME", dres.get("target") == "B" and dres.get("paused") == "paused", str((dres.get("target"), dres.get("paused"))))
 check("dashboard: speed, field of view, colour click and the camera fail-safe switch are applied",
       dres.get("settings") == (18.0, False, [80.0], [("B", 112)]) or (dres.get("settings") and dres["settings"][0] == 18.0 and dres["settings"][1] is False and dres["settings"][2] == [80.0] and dres["settings"][3]), str(dres.get("settings")))
 check("dashboard: the camera picture is a JPEG", dres.get("jpg") == (200, True), str(dres.get("jpg")))
 check("dashboard: manual drive writes the wheel speeds, STOP stops", bool(dres.get("manual_writes")) and dres.get("stopped") == "stopped", str((dres.get("manual_writes"), dres.get("stopped"))))
+check("dashboard: an experiment toggle changes the setting and Reset puts it back", dres.get("exp_on") == (True, 28) and dres.get("exp_reset") == 0, str((dres.get("exp_on"), dres.get("exp_reset"))))
 check("dashboard: events reach the log", {"ROVER", "INFO"} <= (dres.get("log_tags") or set()), str(dres.get("log_tags")))
 
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r in results if r[1]), len(results)))

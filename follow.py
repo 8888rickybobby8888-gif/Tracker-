@@ -35,6 +35,7 @@ from micromelon import *                                       # Motors, IR, Rov
 from micromelon._robot_comms import MicromelonType as OPTYPE
 
 import evade
+import experiments
 import lidar_rx
 import my_chase
 import plan
@@ -419,6 +420,7 @@ def main(argv=None):
                 "yaw": yaw_to_leader, "lidar": lidar, "threat": threat, "timing": timing, "slots": slots, "colours": colours,
                 "behind": behind, "ir": ir, "floor": floor_flags,
                 "settings": {"speed": evade.MAX_SPEED_CM_S, "fov": tr.fov_deg if tr is not None else 70.0, "camstop": brain.safety_camera_stop},
+                "experiments": experiments.snapshot(),
                 "log": list(events)}
 
     def command(c):
@@ -431,6 +433,17 @@ def main(argv=None):
                     return {"error": "bad rover id"}
                 conn["err"], rid["go_at"] = None, 0.0
                 log("ROVER", f"Connecting to rover {rid['id']}")
+            return {"ok": True}
+        if k == "experiment":                                # the Experiments panel: works before the rover is connected too
+            try:
+                v = experiments.set_value(str(c.get("id")), c.get("value"))
+            except (KeyError, ValueError) as e:
+                return {"error": str(e)}
+            log("WARN", f"Experiment {c.get('id')}: {v}")
+            return {"ok": True, "value": v}
+        if k == "experiments_reset":
+            experiments.reset()
+            log("INFO", "All experiments back to their defaults")
             return {"ok": True}
         if not ready.is_set():
             return {"error": "the rover is not connected yet"}

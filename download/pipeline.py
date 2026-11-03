@@ -295,7 +295,14 @@ class Pipeline:
                 self.planner.set_target(self.brain.defended_who)   # whoever made us evade becomes the new target
             p = self.planner.update(st, now)
             self.last_plan = p
-            self._set(p.yaw_to_waypoint if p else None, p.yaw_to_target if p else None)
+            yw, yt = (p.yaw_to_waypoint, p.yaw_to_target) if p else (None, None)
+            if p is not None and evade.USE_ONBOARD_CHASE and not p.blocked and not p.engaged and p.target:
+                ob = self.onboard(now).get(p.target)          # our own camera sees the target close and ahead: its bearing is exact
+                if ob is not None and ob[1] <= evade.ONBOARD_CHASE_M and abs(ob[0]) <= evade.ONBOARD_CHASE_FRONT_DEG:
+                    blend = lambda ext: ext if ext is None else evade.wrap(ext + evade.ONBOARD_CHASE_W * evade.wrap(ob[0] - ext))
+                    yw, yt = blend(yw), blend(yt)
+                    self.onboard_chase_steps = getattr(self, "onboard_chase_steps", 0) + 1
+            self._set(yw, yt)
 
     def on_onboard(self, bearings, now):
         """The follower's OWN camera: {opponent name: (bearing_deg relative to the rover's front, + = left; range_m)} for the balloons it

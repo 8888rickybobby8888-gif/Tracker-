@@ -263,6 +263,8 @@ fail-safe switch, manual drive, and **START / PAUSE / STOP** plus the **Rover ID
 - It listens on this computer only, and every command needs a random token that is inside the page, so another web page cannot press START for you.
 - The old window with its keys is still there: `python follow.py --camera 1 --window` (R + number + Enter = rover ID, P = pause).
 - Needs `--camera N` (the external camera). `--onboard` on its own keeps the old window.
+- **Experiments panel** (bottom of the page): every experimental option as a switch, with what the simulator measured for it. Changes apply on the next step,
+  are written to the event log, and **Reset all to defaults** undoes them. (`experiments.py` is the list.)
 - Not on the dashboard because it cannot be real: battery and ultrasonic (nothing reads them), scanning the arena (run `scan_arena.py` / `mark_arena.py`
   first, they need the camera). The IR bars show the last reading the rover took when it had to pick a turning side.
 
