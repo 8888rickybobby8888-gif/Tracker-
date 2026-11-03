@@ -124,7 +124,11 @@ def main(argv=None):
     rc = RoverController()
     tap = evade.MotionTap(OPTYPE.MOTOR_SET)
     ready, conn = threading.Event(), {"err": None, "busy": False}
-    use_dash = args.camera is not None and not args.window and not (args.onboard and args.camera is None)
+    use_dash = not args.window and not (args.onboard and args.camera is None)     # the dashboard is the default; --onboard on its own and --window keep the old window
+    if use_dash and args.camera is None:
+        args.camera = 0                                         # no --camera given: use camera 0 (add --camera N for another one)
+        print("No --camera given: using camera 0. (Add --camera 1, 2 ... for another one.)")
+    print("Starting " + ("the dashboard version" if use_dash else "the window version") + " ...")
     rid = {"id": args.rover, "typing": None, "go_at": time.time() + (max(AUTO_CONNECT_S, 8.0) if (use_dash and AUTO_CONNECT_S > 0) else AUTO_CONNECT_S)}
     events = collections.deque(maxlen=80)
     def log(tag, msg):

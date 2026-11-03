@@ -10,6 +10,6 @@ WHAT IS IN THIS FOLDER
 FIRST RUN
   1. pip install -r requirements.txt
   2. python mark_arena.py        (or scan_arena.py) to save arena.json
-  3. python follow.py --camera 1      opens the DASHBOARD in your browser (rover ID box, START/PAUSE/STOP, camera, map, lidar...)
+  3. python follow.py                 (camera 0; or --camera 1) opens the DASHBOARD in your browser (rover ID box, START/PAUSE/STOP, camera, map, lidar...)
      python follow.py --camera 1 --onboard http://<esp32-ip>:81/stream     tandem with the rover's own camera
 Not included on purpose: the simulator and tests (simulate.py, sim_world.py, tests/, run_tests.py, sim_output/). Get them from the repo.

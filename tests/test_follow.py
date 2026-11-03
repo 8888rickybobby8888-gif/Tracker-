@@ -279,6 +279,19 @@ check("dashboard: manual drive writes the wheel speeds, STOP stops", bool(dres.g
 check("dashboard: an experiment toggle changes the setting and Reset puts it back", dres.get("exp_on") == (True, 28) and dres.get("exp_reset") == 0, str((dres.get("exp_on"), dres.get("exp_reset"))))
 check("dashboard: events reach the log", {"ROVER", "INFO"} <= (dres.get("log_tags") or set()), str(dres.get("log_tags")))
 
+
+# ---- no --camera given: the dashboard still starts (camera 0)
+DPORT2 = DPORT + 5
+def side2():
+    for _ in range(60):
+        try:
+            code, page = urllib.request.urlopen(f"http://127.0.0.1:{DPORT2}/", timeout=2).status, b"ok"; dres["nocam"] = code; return
+        except Exception: time.sleep(0.1)
+SIDE_TASK = side2
+run_follow(["--port", str(DPORT2)], secs=2.5, window=False)
+SIDE_TASK = None
+check("no --camera: the dashboard starts anyway (camera 0 is used)", dres.get("nocam") == 200, str(dres.get("nocam")))
+
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r in results if r[1]), len(results)))
 for r in results:
     if not r[1]: print("   FAILED:", r[0], r[2])
