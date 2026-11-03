@@ -108,3 +108,14 @@ It is a straight trade: the earlier and harder the rover leaves a fight to get c
 (it turns away from the opponent, or pushes into it, and its balloon is exposed). The non-hunter scenarios only gain (`chase_around` 26 -> 0 tape frames,
 `three_calm` 82 -> 22, same wins). The cost is entirely in fights against hunters (`hunter` scenario: 9 of 12 survived -> 4 of 12). To change the balance,
 edit `ESCAPE_TAPE_M` / `ESCAPE_NOGO_M` / `ESCAPE_IN_CONTACT` at the top of `evade.py`.
+
+
+## Yaw changed when the camera moved (rover static)
+Reported on the real setup. Reproduced in the renderer with a static follower (true heading 20 deg) seen from four camera positions
+(`tests/test_units.py`): the old single-marker `solvePnP` heading read 20.6 / **78.3** / -2.7 / 22.4 deg (it flips between two look-alike
+answers at a slant), so `yaw to nearest` moved by up to 78 deg. `Tracker._plane_pose` (`PLANE_MARKER = True`) casts the four corner rays onto the
+marker's known horizontal plane instead: 20.6 / 20.6 / 20.3 / 20.3 deg, and the yaw to the opponent varies by about 4-5 deg over all positions
+(the rest is the floor-marker pose and the assumed FOV). Two of my seven test positions still cannot lock the floor (marker too edge-on or
+out of frame): keep the floor marker well in view, camera well above the floor.
+Full-render `hunter`, 16 seeds, plane vs old heading: 2 wins / 9 pops / 5 time-outs / 1 run with a line crossing, against 3 / 7 / 6 / 0. That
+difference is inside the noise of this scenario, so the fix is kept for the bug it removes, not for the fight.

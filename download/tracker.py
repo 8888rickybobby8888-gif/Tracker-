@@ -54,6 +54,7 @@ MARKER_SIZE = 0.08                # side length of the follower's marker, metres
 MARKER_LAYOUT = "top"
 TOP_MARKER_ID = 0
 TOP_MARKER_OFFSET = (0.0, 0.0)    # "top": marker centre from the rover's centre: (forward, left), metres (MEASURE)
+PLANE_MARKER = True               # a marker that lies flat on the rover gets its heading from the floor plane, not from solvePnP (no 30-60 degree flips at oblique camera angles)
 MARKER_HEIGHT = 0.08              # floor -> marker centre, metres (MEASURE; "top": the rover's top surface)
 POST_RADIUS = 0.04                # "post" only: robot centre -> face of a marker, metres
 TILT_DEG = 20.0                   # "post" only: backwards lean of each face (0 = vertical)
@@ -224,6 +225,28 @@ class Tracker:
         T[:3, 3] = tvec.ravel()
         return T, err                                    # T: camera <- marker
 
+
+    def _plane_pose(self, corners):
+        """Floor <- marker for a marker that lies FLAT (horizontal, at MARKER_HEIGHT): cast each corner's camera ray onto that plane and take
+        the position and heading straight from the four floor points. The usual single-marker solve (solvePnP) can flip between two
+        look-alike answers when the marker is small or seen at a slant, which turned the heading by 30-60 degrees whenever the camera was
+        moved to a low side angle; this cannot, because the marker's tilt is known instead of guessed."""
+        pts = [self._pixel_to_floor(tuple(c), MARKER_HEIGHT) for c in corners]
+        if any(p is None for p in pts):
+            return None
+        p = np.array(pts, float)
+        u = (p[1] + p[2]) / 2.0 - (p[0] + p[3]) / 2.0          # marker +x (left edge -> right edge) on the floor
+        n = float(np.linalg.norm(u))
+        if n < 0.5 * MARKER_SIZE or n > 1.5 * MARKER_SIZE:     # the four points don't make a marker-sized square: bad detection
+            return None
+        th = math.atan2(u[1], u[0])
+        c, sn = math.cos(th), math.sin(th)
+        c0 = p.mean(axis=0)
+        T = np.eye(4)
+        T[:3, :3] = np.array([[c, -sn, 0.0], [sn, c, 0.0], [0.0, 0.0, 1.0]])
+        T[:3, 3] = [c0[0], c0[1], MARKER_HEIGHT]
+        return T
+
     # ---- floor frame ---------------------------------------------------------
     def _set_floor(self, T, now):
         """T: camera <- floor frame."""
@@ -344,6 +367,10 @@ class Tracker:
             if facing < MIN_FACING:                      # too oblique: pose is unreliable
                 continue
             Tf = self.floor_from_cam @ T @ self.M_inv[mid]   # floor <- robot
+            if PLANE_MARKER and FACES[mid][1] is None:       # the marker lies FLAT on the rover: use that knowledge (see _plane_pose)
+                Tp = self._plane_pose(corners)
+                if Tp is not None:
+                    Tf = Tp @ self.M_inv[mid]
             w = facing ** 2 / (err + 0.5)
             obs.setdefault(FACES[mid][0], []).append(
                 (Tf[0, 3], Tf[1, 3], math.atan2(Tf[1, 0], Tf[0, 0]), w))
