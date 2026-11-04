@@ -23,7 +23,7 @@ import time
 import cv2
 import numpy as np
 
-from tracker import hsv_ranges_around        # same click-to-set-colour helper as tracker.py
+from tracker import hsv_ranges_around, is_red_like, balloon_shaped        # same click-to-set-colour helper as tracker.py
 
 # ----------------------------- CONFIG ---------------------------------------
 STREAM_URL = "http://192.168.4.1:81/stream"   # ESP32-CAM default MJPEG stream; use your camera's IP
@@ -180,8 +180,16 @@ class MultiTracker:
             cnts, _ = cv2.findContours(self._one.mask(frame), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if not cnts:
                 continue
-            c = max(cnts, key=cv2.contourArea)
-            if cv2.contourArea(c) < self.min_area:
+            red = is_red_like(ranges)                 # a RED balloon must not be confused with the red tape (long, thin, low in the picture)
+            c = None
+            for cand in sorted(cnts, key=cv2.contourArea, reverse=True):
+                if cv2.contourArea(cand) < self.min_area:
+                    break
+                if red and not balloon_shaped(cand):
+                    continue
+                c = cand
+                break
+            if c is None:
                 continue
             m = cv2.moments(c)
             cx = m["m10"] / m["m00"]

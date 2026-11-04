@@ -286,6 +286,8 @@ def main(argv=None):
             shared["jpg"], shared["jpg_t"] = buf.tobytes(), time.time()
 
     def on_tick(tr, cap):                                    # runs in the vision loop: changes that must happen there
+        if planner is not None and getattr(tr, "tape_poly", None) is None and hasattr(tr, "set_tape"):
+            tr.set_tape(planner.arena.poly)                  # lets a red balloon be told from the red tape
         v = shared.get("fov")
         if v is not None:
             shared["fov"] = None

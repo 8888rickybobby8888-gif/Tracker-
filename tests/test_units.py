@@ -747,6 +747,37 @@ check("experiments: the snapshot lists every option with a changed flag source",
 _xp.reset()
 check("experiments: reset puts every setting back to what the program started with", (ev.BACKOFF_SPEED, ev.USE_ONBOARD_CHASE, pl.TARGET_MODE) == _d0, str((ev.BACKOFF_SPEED, ev.USE_ONBOARD_CHASE, pl.TARGET_MODE)))
 
+
+# ---- a RED balloon must not be taken for the red tape
+_bgr_a = _swo.BGR["A"]
+_swo.BGR["A"] = (55, 55, 215)                                     # the same red as the tape
+_rend_r = _swo.Renderer(seed=1)
+_cam_r = _swo.Cam(_tkc.intrinsics_from_fov(_swo.SIZE, 70.0), _look([0.80, -0.95, 1.75], [0.80, 0.0, 0.0]))
+def _red_err(apos, guard):
+    _tkc.RED_GUARD = guard
+    snap = types.SimpleNamespace(agents={"follower": (0.45, -0.30, math.radians(20), False), "A": (apos[0], apos[1], math.radians(200), False)})
+    truth = (apos[0] - _swo.BALLOON_BACK * math.cos(math.radians(200)), apos[1] - _swo.BALLOON_BACK * math.sin(math.radians(200)))
+    tr = _tkc.Tracker(size=_swo.SIZE, fov_deg=70.0)
+    class _C:
+        def read(self_): return True, _rend_r.render(snap, _cam_r)
+    tr.lock_floor(_C(), n=8)
+    hh, ss, vv = np.median(cv2.cvtColor(np.uint8([[[55, 55, 215]]]), cv2.COLOR_BGR2HSV).reshape(-1, 3), axis=0)
+    tr.opp_hsv["A"] = _tkc.hsv_ranges_around(int(hh), int(ss), int(vv), ds=30, dv=30)
+    tr.set_tape(_swo.ARENA)
+    for _ in range(8): st = tr.update(_rend_r.render(snap, _cam_r))
+    _tkc.RED_GUARD = True
+    a = st.get("A")
+    return None if a is None else math.hypot(a["x"] - truth[0], a["y"] - truth[1])
+_e_off = [_red_err(p, False) for p in ((1.0, 0.30), (1.15, 0.50))]
+_e_on = [_red_err(p, True) for p in ((1.0, 0.30), (1.15, 0.50))]
+_swo.BGR["A"] = _bgr_a
+check("red balloon: without the guard the red TAPE is taken for it (errors of 0.3 m and more)", all(e is not None and e > 0.3 for e in _e_off), str(_e_off))
+check("red balloon: with the guard (tape band ignored, round blobs only) it is found within 5 cm", all(e is not None and e < 0.05 for e in _e_on), str(_e_on))
+_cnt_line = np.array([[[0, 0]], [[200, 0]], [[200, 8]], [[0, 8]]], np.int32)
+_cnt_disc = cv2.ellipse(np.zeros((60, 60), np.uint8), (30, 30), (14, 14), 0, 0, 360, 255, -1)
+_cd = cv2.findContours(_cnt_disc, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0][0]
+check("balloon_shaped: a disc passes, a long thin strip (tape) does not", _tkc.balloon_shaped(_cd) and not _tkc.balloon_shaped(_cnt_line), "")
+
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]
 for r_ in failed:
