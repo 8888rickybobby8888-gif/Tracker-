@@ -250,6 +250,15 @@ Folder `rover_esp32/` (copy it whole, the folder name must match the .ino name):
 The lidar needs nothing more: `follow.py` listens on UDP port 4210. If the hotspot blocks broadcast (some phones do), set `LIDAR_DEST` in `lidar_udp.h`
 to the computer's IP. Reserve a fixed address for the board in the hotspot's settings if you can.
 
+### The ESP32 will not connect to the hotspot
+After 15 s the sketch prints a **scan** of the networks it can see and says which case you are in (Serial Monitor, 115200 baud).
+- **Your hotspot is not in the list:** it is probably 5 GHz only. The ESP32 only does **2.4 GHz**. iPhone: Personal Hotspot > turn on *Maximize Compatibility*.
+  Android: Hotspot settings > AP band / Band > *2.4 GHz*. Windows: Mobile hotspot > Edit > Network band > *2.4 GHz*. Also check it is not hidden and the screen of the phone stays on.
+- **It is in the list (marked >>) but will not connect:** wrong password, or the security is WPA3 only (set it to WPA2 or WPA2/WPA3), or the hotspot allows too few devices.
+- **Spelling:** the name is case sensitive and must match exactly. Avoid emoji, curly apostrophes and spaces at the ends. Use a password of 8+ plain characters.
+- **Signal:** keep the board within a few metres of the hotspot while testing. Weak signal (-80 dBm or worse) drops the connection.
+- **Test with another hotspot** (a phone instead of the computer, or the reverse) to see whether the board or the hotspot is the problem.
+
 ### Board not detected by the Arduino IDE (no port under Tools > Port)
 0. **Two USB-C sockets (an ESP32-S3 board):** plug into the one marked **UART/COM** first (it has a USB-to-serial chip, so it shows as a COM port). The one marked **USB** is the chip's own USB: it only shows up reliably in bootloader mode (hold **BOOT**, tap **RESET**, release **BOOT**) and needs *USB CDC On Boot: Enabled*.
 1. **Cable:** use a DATA cable. Many micro-USB / USB-C cables only charge. Try another cable and another USB port (no hub).

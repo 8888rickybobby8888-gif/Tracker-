@@ -184,18 +184,56 @@ static void startServer() {
   }
 }
 
+static const char* authName(int a) {
+  switch (a) {
+    case 0: return "open";
+    case 1: return "WEP";
+    case 2: return "WPA";
+    case 3: return "WPA2";
+    case 4: return "WPA/WPA2";
+    case 5: return "WPA2-Enterprise (not supported here)";
+    case 6: return "WPA3 only (may fail: set the hotspot to WPA2)";
+    case 7: return "WPA2/WPA3";
+    default: return "other";
+  }
+}
+
+// Prints what this board can see, so you can tell "the hotspot is invisible" (5 GHz / hidden / too far) from "visible but the password is wrong".
+static void diagnoseWifi() {
+  Serial.printf("\nWiFi status code %d  (1 = network not found, 4 = connect failed / wrong password, 6 = disconnected)\n", (int)WiFi.status());
+  Serial.println("Scanning for 2.4 GHz networks this board can see ...");
+  int n = WiFi.scanNetworks();
+  bool found = false;
+  for (int i = 0; i < n; i++) {
+    String ssid = WiFi.SSID(i);
+    bool mine = (ssid == String(WIFI_SSID));
+    if (mine) found = true;
+    Serial.printf("  %s %-32s channel %2d  %4d dBm  %s\n", mine ? ">>" : "  ", ssid.c_str(), (int)WiFi.channel(i), (int)WiFi.RSSI(i), authName((int)WiFi.encryptionType(i)));
+  }
+  if (n <= 0) Serial.println("  (no networks seen at all: antenna / board problem, or very far away)");
+  if (!found) {
+    Serial.printf("'%s' is NOT in the list. Likely: the hotspot is 5 GHz only (set it to 2.4 GHz), hidden, switched off, too far, or the name is spelled differently (case matters).\n", WIFI_SSID);
+  } else {
+    Serial.printf("'%s' IS visible, so the password is wrong, or the security is WPA3-only, or the hotspot limits devices / needs its screen on.\n", WIFI_SSID);
+  }
+  WiFi.scanDelete();
+}
+
 static void connectWifi() {
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);                       // power saving adds latency
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.printf("Connecting to WiFi '%s' ", WIFI_SSID);
   unsigned long t0 = millis();
+  bool diagnosed = false;
   while (WiFi.status() != WL_CONNECTED) {
     delay(300);
     Serial.print(".");
-    if (millis() - t0 > 20000) {              // try again from scratch
-      Serial.println("\nStill not connected: check the name and password, and that it is a 2.4 GHz network.");
+    if (millis() - t0 > 15000) {              // try again from scratch, and say why it is failing
+      if (!diagnosed) { diagnoseWifi(); diagnosed = true; }
+      Serial.println("Trying again ...");
       WiFi.disconnect();
+      delay(200);
       WiFi.begin(WIFI_SSID, WIFI_PASS);
       t0 = millis();
     }
