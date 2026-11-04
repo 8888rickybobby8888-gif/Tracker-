@@ -209,10 +209,7 @@ class Plan:
 class Planner:
     def __init__(self, arena, target="nearest"):
         self.arena = arena
-        self.free = offset_convex(arena.poly, -(ROBOT_RADIUS_M + TAPE_MARGIN_M))
-        self.block_threat = offset_rounded(arena.nogo, ROBOT_RADIUS_M + NOGO_MARGIN_M) if arena.nogo else None
-        self.block_calm = offset_rounded(arena.nogo, ROBOT_RADIUS_M + NOGO_MARGIN_CALM_M) if arena.nogo else None
-        self.block = self.block_threat                       # the keep-out in force: the big one while anything is moving
+        self.rebuild()
         self.target_pref = target
         self._target = None
         self._best_d, self._best_t = None, None          # closest we have got to the current target, and when
@@ -361,6 +358,14 @@ class Planner:
         if self.target_pref == "nearest" and name and name != self._target:
             self._target = name
             self._best_d, self._best_t = None, None
+
+    def rebuild(self):
+        """(Re)build the free area and the keep-out zones from the current margins (the Settings page calls this after a change)."""
+        arena = self.arena
+        self.free = offset_convex(arena.poly, -(ROBOT_RADIUS_M + TAPE_MARGIN_M))
+        self.block_threat = offset_rounded(arena.nogo, ROBOT_RADIUS_M + NOGO_MARGIN_M) if arena.nogo else None
+        self.block_calm = offset_rounded(arena.nogo, ROBOT_RADIUS_M + NOGO_MARGIN_CALM_M) if arena.nogo else None
+        self.block = self.block_threat                       # the keep-out in force: the big one while anything is moving
 
     def set_preference(self, name):
         """The dashboard's chase-target buttons: \"nearest\" or an opponent name."""

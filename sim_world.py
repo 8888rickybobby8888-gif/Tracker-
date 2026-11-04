@@ -40,6 +40,8 @@ BODY_L, BODY_W, BODY_H = 0.12, 0.10, 0.08
 PIN_TIP = 0.10                   # rover centre -> pin tip
 BALLOON_BACK = 0.10              # rover centre -> balloon, backwards (a stick off the back, clear of the top marker)
 BALLOON_Z, BALLOON_R = 0.15, 0.045
+tk.set_layout("top")                                # the simulator's tuned results use the single flat marker (set_layout("post") draws four faces instead)
+tk.MARKER_SIZE = 0.08                              # the simulator's tuned scenarios use an 8 cm flat marker
 tk.TOP_MARKER_OFFSET = (0.02, 0.0)   # the follower's marker sits slightly forward of centre, away from its own balloon
 BODY_CIRCLE = 0.07               # used for lidar returns and collisions
 NOGO_VIOLATION_M = BODY_CIRCLE   # a violation is counted when the follower's centre is closer than this to the no-go zone ...
@@ -290,6 +292,7 @@ class Cam:
         self.K, self.T = K, cam_from_floor
         self.rvec = cv2.Rodrigues(cam_from_floor[:3, :3])[0]
         self.tvec = cam_from_floor[:3, 3].reshape(3, 1)
+        self.pos = -cam_from_floor[:3, :3].T @ cam_from_floor[:3, 3]      # camera centre in the floor frame
 
     def project(self, pts):
         pts = np.asarray(pts, np.float64).reshape(-1, 3)
@@ -335,7 +338,7 @@ class Renderer:
         self.pool = [np.rint(self.rng.normal(0, noise, (SIZE[1], SIZE[0], 3))).astype(np.int16) for _ in range(5)] if noise > 0 else []
         d = cv2.aruco.getPredefinedDictionary(tk.DICTIONARY)
         self.markers = {i: cv2.cvtColor(cv2.aruco.generateImageMarker(d, i, 120), cv2.COLOR_GRAY2BGR)
-                        for i in (tk.FLOOR_ID, tk.TOP_MARKER_ID)}
+                        for i in sorted({tk.FLOOR_ID, tk.TOP_MARKER_ID, 0, 1, 2, 3})}
 
     def _marker(self, img, marker_id, corners3d, cam):
         c3 = np.asarray(corners3d, float)
@@ -383,11 +386,15 @@ class Renderer:
                 self._poly(img, cam, [foot[i], foot[(i + 1) % 4], top[(i + 1) % 4], top[i]], (92, 96, 104) if i % 2 else (78, 82, 90))
             self._poly(img, cam, top, (120, 126, 136))
             if name == "follower":
-                M = tk.robot_from_marker(None)
-                ob = tk.obj_points(tk.MARKER_SIZE)
                 R = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
-                corners = [R @ (M @ np.array([px, py, 0.0, 1.0]))[:3] + np.array([x, y, 0.0]) for px, py, _ in ob]
-                self._marker(img, tk.TOP_MARKER_ID, corners, cam)
+                ob = tk.obj_points(tk.MARKER_SIZE)
+                for mid, (_, ang) in tk.FACES.items():                  # one flat marker ("top") or four faces of a post ("post")
+                    M = tk.robot_from_marker(ang)
+                    corners = [R @ (M @ np.array([px, py, 0.0, 1.0]))[:3] + np.array([x, y, 0.0]) for px, py, _ in ob]
+                    centre = R @ M[:3, 3] + np.array([x, y, 0.0])
+                    if ang is not None and float(np.dot(R @ M[:3, 2], cam.pos - centre)) <= 0.0:
+                        continue                                          # a face looking away from the camera cannot be seen
+                    self._marker(img, mid, corners, cam)
             if not popped:
                 bx, by = x - BALLOON_BACK * c, y - BALLOON_BACK * s
                 base = cam.project([(bx, by, BODY_H)])[0]

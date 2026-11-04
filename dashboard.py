@@ -21,6 +21,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PAGE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard.html")
+SETTINGS_PAGE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.html")
 MAX_BODY = 4096
 
 
@@ -60,6 +61,12 @@ class Dashboard:
                         html = open(PAGE, encoding="utf-8").read().replace("__TOKEN__", dash.token)
                     except OSError:
                         return self._send(500, "dashboard.html is missing next to dashboard.py", "text/plain")
+                    return self._send(200, html, "text/html; charset=utf-8")
+                if path in ("/settings", "/settings.html"):
+                    try:
+                        html = open(SETTINGS_PAGE, encoding="utf-8").read().replace("__TOKEN__", dash.token)
+                    except OSError:
+                        return self._send(500, "settings.html is missing next to dashboard.py", "text/plain")
                     return self._send(200, html, "text/html; charset=utf-8")
                 if path == "/api/state":
                     try:

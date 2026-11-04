@@ -253,6 +253,11 @@ def side():
         xs = {e["id"]: e for e in json.loads(http("/api/state")[1])["experiments"]}
         dres["exp_on"] = (xs["backoff"]["value"], follow.evade.BACKOFF_SPEED)
         http("/api/cmd", {"cmd": "experiments_reset"}, tok); time.sleep(0.2)
+        code, pg = http("/settings"); dres["settings_page"] = (code, b"Rover settings" in pg, b"__TOKEN__" not in pg)
+        lst = json.loads(http("/api/cmd", {"cmd": "settings_list"}, tok)[1]); dres["settings_n"] = len(lst.get("settings", []))
+        r1 = json.loads(http("/api/cmd", {"cmd": "setting", "key": "evade.EVADE_LATENCY_S", "value": 0.6}, tok)[1]); dres["setting_set"] = (r1.get("value"), follow.evade.EVADE_LATENCY_S)
+        r2 = json.loads(http("/api/cmd", {"cmd": "setting", "key": "evade.NOPE", "value": 1}, tok)[1]); dres["setting_bad"] = "error" in r2
+        http("/api/cmd", {"cmd": "settings_reset_all"}, tok); dres["setting_reset"] = follow.evade.EVADE_LATENCY_S
         dres["exp_reset"] = follow.evade.BACKOFF_SPEED
         http("/api/cmd", {"cmd": "stop"}, tok); time.sleep(0.3)
         dres["stopped"] = json.loads(http("/api/state")[1])["run"]["state"]
@@ -277,6 +282,7 @@ check("dashboard: speed, field of view, colour click and the camera fail-safe sw
 check("dashboard: the camera picture is a JPEG", dres.get("jpg") == (200, True), str(dres.get("jpg")))
 check("dashboard: manual drive writes the wheel speeds, STOP stops", bool(dres.get("manual_writes")) and dres.get("stopped") == "stopped", str((dres.get("manual_writes"), dres.get("stopped"))))
 check("dashboard: an experiment toggle changes the setting and Reset puts it back", dres.get("exp_on") == (True, 28) and dres.get("exp_reset") == 0, str((dres.get("exp_on"), dres.get("exp_reset"))))
+check("dashboard: the settings page is served, lists the variables, applies one, refuses a bad key, and resets", dres.get("settings_page") == (200, True, True) and dres.get("settings_n", 0) >= 50 and dres.get("setting_set") == (0.6, 0.6) and dres.get("setting_bad") and dres.get("setting_reset") == 0.4, str((dres.get("settings_page"), dres.get("settings_n"), dres.get("setting_set"), dres.get("setting_bad"), dres.get("setting_reset"))))
 check("dashboard: events reach the log", {"ROVER", "INFO"} <= (dres.get("log_tags") or set()), str(dres.get("log_tags")))
 
 

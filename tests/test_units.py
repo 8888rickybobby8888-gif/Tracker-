@@ -778,6 +778,72 @@ _cnt_disc = cv2.ellipse(np.zeros((60, 60), np.uint8), (30, 30), (14, 14), 0, 0, 
 _cd = cv2.findContours(_cnt_disc, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0][0]
 check("balloon_shaped: a disc passes, a long thin strip (tape) does not", _tkc.balloon_shaped(_cd) and not _tkc.balloon_shaped(_cnt_line), "")
 
+
+# ---- the FOUR-marker (post) layout: heading from every camera position
+_tkc.set_layout("post")
+_rend_p = _swo.Renderer(seed=1)
+_snap_p = types.SimpleNamespace(agents={"follower": (0.80, 0.0, math.radians(20), False)})
+def _post_errs(new):
+    orig = _tkc.Tracker._pose_upright
+    if not new:
+        _tkc.Tracker._pose_upright = lambda self, c, s, Mi: self._pose(c, s)
+    _tkc.MARKER_SIZE = 0.06
+    out = []
+    for pos, tgt in (([0.80, -0.95, 1.75], [0.80, 0.0, 0.0]), ([2.0, 0.0, 1.7], [0.80, 0.0, 0.0]), ([0.80, 1.0, 1.7], [0.80, 0.0, 0.0]), ([0.80, -1.5, 0.9], [0.80, 0.0, 0.0])):
+        cam = _swo.Cam(_tkc.intrinsics_from_fov(_swo.SIZE, 70.0), _look(pos, tgt))
+        tr = _tkc.Tracker(size=_swo.SIZE, fov_deg=70.0)
+        class _Cp:
+            def read(self_): return True, _rend_p.render(_snap_p, cam)
+        tr.lock_floor(_Cp(), n=8)
+        ye = []
+        for i in range(12):
+            st = tr.update(_rend_p.render(_snap_p, cam))
+            if i >= 4 and st.get("follower"): ye.append(abs(((st["follower"]["yaw"] - 20.0 + 180) % 360) - 180))
+        out.append(float(np.mean(ye)) if ye else 999.0)
+    _tkc.Tracker._pose_upright = orig
+    _tkc.MARKER_SIZE = 0.08
+    return out
+_pe_new, _pe_old = _post_errs(True), _post_errs(False)
+_tkc.set_layout("top")
+check("four-marker layout: heading within 5 deg of the truth from four very different camera positions (6 cm markers)", max(_pe_new) < 5.0, str([round(e, 1) for e in _pe_new]))
+check("... and the plain single-marker solve was off by more than 10 deg from at least one (so this catches a regression)", max(_pe_old) > 10.0, str([round(e, 1) for e in _pe_old]))
+check("tracker.set_layout switches between the four-marker and the single-marker layout", (_tkc.set_layout("post") or sorted(_tkc.FACES) == [0, 1, 2, 3]) and (_tkc.set_layout("top") or sorted(_tkc.FACES) == [_tkc.TOP_MARKER_ID]), "")
+
+
+# ---- settings registry (the dashboard's Settings page)
+import settings as _se
+import tempfile as _tf
+_se.reset_all()
+_rb = []
+_r1 = _se.apply("evade.EVADE_LATENCY_S", 99)                              # far above the range: clamped
+check("settings: a value above its range is clamped (and reported)", _r1["clamped"] and ev.EVADE_LATENCY_S == 1.5, str(_r1))
+_se.apply("plan.NOGO_MARGIN_M", 0.2, {"planner": lambda: _rb.append(1)})
+check("settings: a variable with a dependent structure calls its rebuild hook", pl.NOGO_MARGIN_M == 0.2 and _rb == [1], str(_rb))
+check("settings: int, bool and choice kinds are coerced", (_se.apply("evade.CONFIRM_FRAMES", 3.4)["value"] == 3 and _se.apply("pipeline.YAW_FILTER", False)["value"] is False
+      and _se.apply("evade.GRID", "4")["value"] == 4 and _se.apply("evade.GRID", 8)["restart"]), "")
+try:
+    _se.apply("evade.GRID", 5); _bad_s = False
+except ValueError:
+    _bad_s = True
+try:
+    _se.apply("evade.NO_SUCH", 1); _bad_k = False
+except KeyError:
+    _bad_k = True
+check("settings: a value outside a choice list and an unknown key are refused", _bad_s and _bad_k, "")
+_f = os.path.join(_tf.mkdtemp(), "settings.json")
+_n = _se.save(_f)
+_se.reset_all()
+_ok, _bad = _se.load_saved(_f)
+check("settings: save writes only the changed values and load puts them back", _n >= 3 and ev.EVADE_LATENCY_S == 1.5 and pl.NOGO_MARGIN_M == 0.2 and _bad == 0, f"{_n} saved, {_ok} loaded")
+_se.reset_all()
+check("settings: reset all returns every variable to the code's default", ev.EVADE_LATENCY_S == 0.4 and pl.NOGO_MARGIN_M == 0.13 and _pp.YAW_FILTER is True, "")
+check("settings: the list covers every group and nothing in it is unavailable", len({e["group"] for e in _se.listing()}) >= 10 and len(_se.listing()) >= 80, str(len(_se.listing())))
+_pla = pl.Planner(pl.Arena([(0, 0), (1.2, 0), (1.2, 1.13), (0, 1.13)], [(0.6, 0.3), (0.9, 0.565), (0.6, 0.83), (0.3, 0.565)]))
+_before = _pla.block_threat
+pl.NOGO_MARGIN_M = 0.25; _pla.rebuild()
+check("planner.rebuild: the keep-out grows when the margin is raised", not np.array_equal(np.asarray(_pla.block_threat), np.asarray(_before)), "")
+pl.NOGO_MARGIN_M = 0.13
+
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]
 for r_ in failed:

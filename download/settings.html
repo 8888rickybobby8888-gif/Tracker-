@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rover settings</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0e1217;--panel:#161c24;--line:#2b3542;--ink:#e8edf4;--mute:#a3b0c0;--blue:#5aa9ff;--btn:#2f6fbf;--btn2:#202a36;--btn2line:#344154;--green:#3ecf9e;--amber:#f2b84b;--red:#c8323a;--coral2:#ff9d92;
+ --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;--sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px}
+button{font-family:inherit;color:inherit}
+.wrap{max-width:1100px;margin:0 auto;padding:20px max(16px,env(safe-area-inset-left,0px)) 40px;display:flex;flex-direction:column;gap:16px}
+.bar{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:12px 16px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.bar h1{margin:0;font-size:18px;font-weight:600;flex:1 1 auto}
+.btn{min-height:44px;padding:0 16px;background:var(--btn2);color:var(--ink);border:1px solid var(--btn2line);border-radius:8px;font-size:14px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
+.btn.go{background:#1d7f5e;border-color:#1d7f5e;color:#fff;font-weight:600}
+.btn.sm{min-height:34px;padding:0 10px;font-size:12px}
+.btn:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.msg{font-size:13px;color:var(--mute)}
+input[type=search]{min-height:44px;flex:1 1 220px;padding:0 12px;background:var(--bg);color:var(--ink);border:1px solid var(--btn2line);border-radius:8px;font-size:14px}
+details{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+summary{cursor:pointer;padding:14px 16px;font-size:15px;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:12px}
+summary::-webkit-details-marker{display:none}
+summary .n{font-weight:400;color:var(--mute);font-size:12px;font-family:var(--mono)}
+.rows{display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.6fr);gap:8px 16px;padding:12px 16px;border-top:1px solid var(--line);align-items:center}
+.row.changed{background:rgba(242,184,75,.06)}
+.lab{display:flex;flex-direction:column;gap:3px;min-width:0}
+.lab b{font-weight:600}
+.lab .h{font-size:12px;color:var(--mute);line-height:1.45}
+.tag{display:inline-block;font-size:10px;font-weight:600;letter-spacing:.06em;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle}
+.tag.ch{background:var(--amber);color:#1a1204}.tag.rs{background:var(--btn2line);color:var(--ink)}
+.ctl{display:flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap}
+.ctl input[type=range]{flex:1 1 140px;min-width:100px;accent-color:var(--blue)}
+.ctl input[type=number],.ctl select{min-height:40px;width:110px;padding:0 8px;background:var(--bg);color:var(--ink);border:1px solid var(--btn2line);border-radius:8px;font-family:var(--mono);font-size:13px}
+.ctl .u{font-family:var(--mono);font-size:12px;color:var(--mute);min-width:34px}
+.ctl .d{font-family:var(--mono);font-size:11px;color:var(--mute)}
+.ctl input[type=checkbox]{width:22px;height:22px;accent-color:var(--blue)}
+.exps{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;padding:0 16px 16px}
+.exp{display:flex;flex-direction:column;gap:6px;padding:12px 14px;background:var(--bg);border:1px solid var(--line);border-radius:8px;min-width:0}
+.exp.changed{border-color:var(--amber)}
+.exp label{display:flex;align-items:center;gap:10px;font-weight:600;cursor:pointer}
+.exp .n1{font-size:12px;color:var(--mute);line-height:1.5}.exp .n2{font-size:12px;line-height:1.5}
+.exp select{min-height:40px;background:var(--panel);color:var(--ink);border:1px solid var(--btn2line);border-radius:8px;padding:0 10px;font-family:var(--mono)}
+.note{font-size:12px;color:var(--mute);line-height:1.5;margin:0}
+@media (max-width:700px){.row{grid-template-columns:minmax(0,1fr)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <div class="bar">
+  <a class="btn" href="/">&larr; Dashboard</a>
+  <h1>Settings</h1>
+  <span class="msg" id="msg"></span>
+  <button class="btn go" id="bSave" type="button">Save to settings.json</button>
+  <button class="btn" id="bReset" type="button">Reset all to defaults</button>
+ </div>
+ <p class="note">Changes apply straight away (the ones tagged RESTART apply after you restart follow.py). <b>Save</b> writes the values that differ from the defaults to <span class="mono">settings.json</span>, and follow.py loads that file at start. The defaults come from the simulator. The numbers under "Your rover and arena" are measurements: measure your own rover.</p>
+ <div class="bar" style="position:static"><input type="search" id="q" placeholder="Search settings (for example: margin, speed, marker)" aria-label="Search settings"></div>
+ <div id="out"></div>
+</div>
+<script>
+"use strict";
+const TOKEN = "__TOKEN__";
+const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+function post(cmd) {
+  return fetch("/api/cmd", {method: "POST", headers: {"X-Token": TOKEN, "Content-Type": "application/json"}, body: JSON.stringify(cmd)})
+    .then((r) => r.json()).catch(() => ({error: "no answer from the program"}));
+}
+let LIST = [], EXPS = [], openGroups = {"Your rover and arena (measure these)": true};
+
+function fmt(v, s) { if (s.kind === "int") return String(Math.round(v)); const dec = Math.max(0, Math.min(4, -Math.floor(Math.log10(s.step || 0.01)))); return Number(v).toFixed(dec); }
+
+function rowHtml(s) {
+  const key = esc(s.key);
+  let ctl;
+  if (s.kind === "bool") ctl = '<input type="checkbox" data-k="' + key + '" ' + (s.value ? "checked" : "") + ' aria-label="' + esc(s.label) + '">';
+  else if (s.kind === "choice") ctl = '<select data-k="' + key + '" aria-label="' + esc(s.label) + '">' + s.choices.map((c) => '<option' + (String(c) === String(s.value) ? " selected" : "") + ">" + esc(c) + "</option>").join("") + "</select>";
+  else ctl = '<input type="range" data-k="' + key + '" data-r="1" min="' + s.lo + '" max="' + s.hi + '" step="' + s.step + '" value="' + s.value + '" aria-label="' + esc(s.label) + '">'
+    + '<input type="number" data-k="' + key + '" data-n="1" min="' + s.lo + '" max="' + s.hi + '" step="' + s.step + '" value="' + fmt(s.value, s) + '">';
+  return '<div class="row' + (s.changed ? " changed" : "") + '" data-row="' + key + '"><div class="lab"><b>' + esc(s.label)
+    + (s.changed ? '<span class="tag ch">CHANGED</span>' : "") + (s.restart ? '<span class="tag rs">RESTART</span>' : "") + '</b><span class="h">' + esc(s.help) + '</span></div>'
+    + '<div class="ctl">' + ctl + '<span class="u">' + esc(s.unit) + '</span><span class="d">default ' + (s.kind === "float" || s.kind === "int" ? fmt(s.default, s) : esc(String(s.default))) + '</span>'
+    + '<button class="btn sm" type="button" data-reset="' + key + '"' + (s.changed ? "" : " disabled") + '>Reset</button></div></div>';
+}
+
+function expHtml(e) {
+  const ctrl = e.kind === "choice"
+    ? '<span style="font-weight:600">' + esc(e.label) + '</span><select data-x="' + esc(e.id) + '" aria-label="' + esc(e.label) + '">' + e.choices.map((c) => '<option' + (c === e.value ? " selected" : "") + ">" + c + "</option>").join("") + "</select>"
+    : '<label><input type="checkbox" data-x="' + esc(e.id) + '" ' + (e.value ? "checked" : "") + ' style="width:20px;height:20px;accent-color:#5aa9ff">' + esc(e.label) + "</label>";
+  return '<div class="exp' + (e.value !== e.default ? " changed" : "") + '">' + ctrl + (e.value !== e.default ? '<span><span class="tag ch">CHANGED FROM DEFAULT</span></span>' : "") + '<span class="n1">' + esc(e.desc) + '</span><span class="n2">' + esc(e.note) + "</span></div>";
+}
+
+function render() {
+  const q = $("q").value.trim().toLowerCase();
+  const groups = {};
+  LIST.forEach((s) => { if (!q || (s.label + " " + s.help + " " + s.key + " " + s.group).toLowerCase().includes(q)) (groups[s.group] = groups[s.group] || []).push(s); });
+  let h = "";
+  const expShown = EXPS.filter((e) => !q || (e.label + " " + e.desc).toLowerCase().includes(q));
+  if (expShown.length) h += '<details ' + (q || openGroups["__exp"] ? "open" : "") + ' data-g="__exp"><summary>Experiments (switches)<span class="n">' + expShown.length + '</span></summary><div class="exps">' + expShown.map(expHtml).join("") + '</div><div style="padding:0 16px 14px"><button class="btn sm" id="bExpReset" type="button">Reset experiments to defaults</button></div></details>';
+  Object.keys(groups).forEach((g) => {
+    const nch = groups[g].filter((s) => s.changed).length;
+    h += '<details ' + (q || openGroups[g] ? "open" : "") + ' data-g="' + esc(g) + '"><summary>' + esc(g) + '<span class="n">' + groups[g].length + " settings" + (nch ? ", " + nch + " changed" : "") + '</span></summary><div class="rows">' + groups[g].map(rowHtml).join("") + "</div></details>";
+  });
+  $("out").innerHTML = h || '<p class="note">Nothing matches.</p>';
+  const nAll = LIST.filter((s) => s.changed).length;
+  $("msg").textContent = nAll ? nAll + " setting(s) differ from the defaults" : "all settings at their defaults";
+  $("out").querySelectorAll("details").forEach((d) => { d.addEventListener("toggle", () => { openGroups[d.dataset.g] = d.open; }); });
+  $("out").querySelectorAll("[data-k]").forEach((el) => {
+    const s = LIST.find((x) => x.key === el.dataset.k);
+    if (el.dataset.r) el.addEventListener("input", () => { const n = el.parentElement.querySelector("[data-n]"); n.value = fmt(el.value, s); });
+    el.addEventListener("change", () => apply(s, el));
+  });
+  $("out").querySelectorAll("[data-reset]").forEach((b) => { b.onclick = () => post({cmd: "setting_reset", key: b.dataset.reset}).then(load); });
+  $("out").querySelectorAll("[data-x]").forEach((el) => { el.addEventListener("change", () => post({cmd: "experiment", id: el.dataset.x, value: el.type === "checkbox" ? el.checked : el.value}).then(load)); });
+  const be = $("bExpReset"); if (be) be.onclick = () => post({cmd: "experiments_reset"}).then(load);
+}
+
+function apply(s, el) {
+  let v = el.type === "checkbox" ? el.checked : el.value;
+  post({cmd: "setting", key: s.key, value: v}).then((r) => {
+    if (r.error) { $("msg").textContent = "Not applied: " + r.error; return; }
+    $("msg").textContent = (r.clamped ? "Clamped to the allowed range. " : "") + (r.restart ? "Saved for the next start (restart follow.py to use it)." : "Applied.");
+    load();
+  });
+}
+
+function load() {
+  Promise.all([post({cmd: "settings_list"}), fetch("/api/state").then((r) => r.json()).catch(() => ({}))]).then(([r, st]) => {
+    if (r.error) { $("out").innerHTML = '<p class="note">' + esc(r.error) + "</p>"; return; }
+    LIST = r.settings || []; EXPS = st.experiments || [];
+    const keep = document.scrollingElement.scrollTop;
+    render();
+    document.scrollingElement.scrollTop = keep;
+  });
+}
+$("q").addEventListener("input", render);
+$("bSave").onclick = () => post({cmd: "settings_save"}).then((r) => { $("msg").textContent = r.error ? r.error : "Saved " + r.saved + " changed setting(s) to settings.json"; });
+$("bReset").onclick = () => { if ($("bReset").dataset.sure === "1") { post({cmd: "settings_reset_all"}).then(load); $("bReset").dataset.sure = "0"; $("bReset").textContent = "Reset all to defaults"; } else { $("bReset").dataset.sure = "1"; $("bReset").textContent = "Press again to reset all"; setTimeout(() => { $("bReset").dataset.sure = "0"; $("bReset").textContent = "Reset all to defaults"; }, 3000); } };
+load();
+</script>
+</body>
+</html>

@@ -45,13 +45,13 @@ FLOOR_ALPHA = 0.5                 # smoothing of that pose: 1 = none (jittery), 
 FLOOR_HOLD_S = 0.5                # if the floor marker is hidden, keep the last floor frame this long, then report nothing
 FLOOR_JUMP_DEG = 25               # a sudden change bigger than this (or FLOOR_JUMP_M) must be seen on 2 frames in a row
 FLOOR_JUMP_M = 0.25               # before it is believed: one-frame glitches are ignored, a real bump is accepted
-MARKER_SIZE = 0.08                # side length of the follower's marker, metres (bigger = more accurate; fit the rover's top)
+MARKER_SIZE = 0.05                # side length of EACH follower marker, metres (measure the printed black square; bigger = more accurate; 4 to 6 cm works on a post)
 
 # Follower marker layout.
 #   "top":  ONE marker lying flat on top of the follower, its top edge pointing to the rover's FRONT. Best when the
 #           external camera looks down from above (it works at an angle too, but yaw gets noisier).
 #   "post": four markers on the faces of a post (make_markers.py prints them), for a low side-on camera.
-MARKER_LAYOUT = "top"
+MARKER_LAYOUT = "post"            # "post" = FOUR markers on the faces of a post (default); "top" = one flat marker. follow.py --markers top|post
 TOP_MARKER_ID = 0
 TOP_MARKER_OFFSET = (0.0, 0.0)    # "top": marker centre from the rover's centre: (forward, left), metres (MEASURE)
 RED_GUARD = True                  # a RED balloon looks like the red tape: for red-like slots, ignore the tape band (needs arena.json) and long thin blobs
@@ -64,10 +64,24 @@ TILT_DEG = 20.0                   # "post" only: backwards lean of each face (0 
 
 # marker ID -> (robot name, face angle). "post": angle around the robot (0 = front, +90 = left, 180 = back,
 # 270 = right), IDs counter-clockwise seen from above. "top": a single marker, angle None.
-if MARKER_LAYOUT == "top":
-    FACES = {TOP_MARKER_ID: ("follower", None)}
-else:
-    FACES = {0: ("follower", 0), 1: ("follower", 90), 2: ("follower", 180), 3: ("follower", 270)}
+FACES = {}
+
+
+def set_layout(layout):
+    """Choose the follower marker layout: "post" (four markers, IDs 0-3, on the faces of a post) or "top" (one flat marker, ID TOP_MARKER_ID).
+    Call it BEFORE a Tracker is made."""
+    global MARKER_LAYOUT
+    if layout not in ("post", "top"):
+        raise ValueError('layout must be "post" or "top"')
+    MARKER_LAYOUT = layout
+    FACES.clear()
+    if layout == "top":
+        FACES[TOP_MARKER_ID] = ("follower", None)
+    else:
+        FACES.update({0: ("follower", 0), 1: ("follower", 90), 2: ("follower", 180), 3: ("follower", 270)})
+
+
+set_layout(MARKER_LAYOUT)
 
 # Opponents = colour blobs (balloons), up to three slots. Press 1/2/3 in the live view to pick a slot, then click
 # that balloon to set its colour. Or edit the HSV ranges (OpenCV HSV: H 0-179, S/V 0-255).
@@ -178,6 +192,10 @@ class Tracker:
 
     def set_opponent_color(self, name, h, sat, val):
         self.opp_hsv[name] = hsv_ranges_around(int(h), int(sat), int(val))
+
+    def rebuild_geometry(self):
+        """Recompute the marker-on-rover transforms after MARKER_HEIGHT, POST_RADIUS, TILT_DEG or the layout changed (Settings page)."""
+        self.M_inv = {mid: np.linalg.inv(robot_from_marker(ang)) for mid, (_, ang) in FACES.items()}
 
     def set_tape(self, arena_poly):
         """The arena corners (floor frame, the INNER edge of the tape). Lets a red balloon be told from the red tape."""
@@ -300,6 +318,35 @@ class Tracker:
         T[:3, 3] = [c0[0], c0[1], MARKER_HEIGHT]
         return T
 
+    def _pose_upright(self, corners, size, M_inv):
+        """Pose of a marker (camera <- marker, reprojection error) for a marker whose place on the ROVER is known. A single square marker has two
+        look-alike solutions (the 'flip' that turns the heading by tens of degrees when seen at a slant); of the two, take the one that leaves the
+        ROVER standing upright on the floor. Falls back to the normal solve."""
+        pts = obj_points(size)
+        try:
+            n, rvecs, tvecs, errs = cv2.solvePnPGeneric(pts, corners, self.K, self.D, flags=cv2.SOLVEPNP_IPPE_SQUARE)
+        except cv2.error:
+            return self._pose(corners, size)
+        if not n:
+            return self._pose(corners, size)
+        best, best_up = None, -2.0
+        for rv, tv, e in zip(rvecs, tvecs, errs):
+            T = np.eye(4)
+            T[:3, :3] = cv2.Rodrigues(rv)[0]
+            T[:3, 3] = np.asarray(tv).ravel()
+            up = float((self.floor_from_cam @ T @ M_inv)[2, 2])      # z component of the rover's up axis in the floor frame (1 = upright)
+            if up > best_up:
+                best, best_up = (rv, tv, T), up
+        rv, tv, T = best
+        try:
+            rv, tv = cv2.solvePnPRefineLM(pts, corners, self.K, self.D, rv, tv)
+            T[:3, :3] = cv2.Rodrigues(rv)[0]
+            T[:3, 3] = np.asarray(tv).ravel()
+        except cv2.error:
+            pass
+        proj, _ = cv2.projectPoints(pts, cv2.Rodrigues(T[:3, :3])[0], T[:3, 3].reshape(3, 1), self.K, self.D)
+        return T, float(np.linalg.norm(proj.reshape(-1, 2) - corners, axis=1).mean())
+
     # ---- floor frame ---------------------------------------------------------
     def _set_floor(self, T, now):
         """T: camera <- floor frame."""
@@ -409,7 +456,7 @@ class Tracker:
         for mid, corners in self.last_det.items():
             if mid not in FACES:
                 continue
-            res = self._pose(corners, MARKER_SIZE)
+            res = self._pose(corners, MARKER_SIZE) if FACES[mid][1] is None else self._pose_upright(corners, MARKER_SIZE, self.M_inv[mid])
             if res is None:
                 continue
             T, err = res

@@ -37,6 +37,7 @@ from micromelon._robot_comms import MicromelonType as OPTYPE
 import evade
 import experiments
 import lidar_rx
+import settings
 import my_chase
 import plan
 import pipeline
@@ -112,12 +113,20 @@ def main(argv=None):
                     help="use the floor colour sensors as a tape detector (tape guard + position fix). NOT TESTED ON THE REAL ROVER: "
                          "start with the rover on bare floor inside the arena, it learns what the floor reads")
     ap.add_argument("--no-plan", action="store_true", help="don't plan routes: yaw points straight at the nearest opponent")
+    ap.add_argument("--markers", choices=["post", "top"], default=None, help="follower marker layout: post = FOUR markers on the faces of a post (default), top = one flat marker on top")
     ap.add_argument("--window", action="store_true", help="use the plain OpenCV window (keys) instead of the browser dashboard")
     ap.add_argument("--no-browser", action="store_true", help="do not open the dashboard in the browser (open the printed address yourself)")
     ap.add_argument("--port", type=int, default=8765, help="dashboard port (default 8765; the next free one is used if it is busy)")
     ap.add_argument("--target", default="nearest", help='which opponent to chase: "nearest" (default) or a slot name A/B/C')
     args = ap.parse_args(argv)
 
+    n_ok, n_bad = settings.load_saved()
+    if n_ok or n_bad:
+        print(f"Settings: loaded {n_ok} saved value(s) from {settings.SETTINGS_FILE}" + (f" ({n_bad} skipped: unknown or invalid)" if n_bad else ""))
+    import tracker as _trk_layout
+    if hasattr(_trk_layout, "set_layout"):
+        _trk_layout.set_layout(args.markers or _trk_layout.MARKER_LAYOUT)
+        print(f"Follower markers: {_trk_layout.MARKER_LAYOUT} ({'four markers on a post, IDs 0-3' if _trk_layout.MARKER_LAYOUT == 'post' else 'one flat marker, ID 0'}), {_trk_layout.MARKER_SIZE * 100:.1f} cm each")
     if args.max_speed is not None:
         evade.set_max_speed(args.max_speed)
     print(f"Max wheel speed: {evade.MAX_SPEED_CM_S:.0f} cm/s (applies to every motor command)")
@@ -285,7 +294,13 @@ def main(argv=None):
         if ok:
             shared["jpg"], shared["jpg_t"] = buf.tobytes(), time.time()
 
+    set_hooks = {"planner": lambda: planner.rebuild() if planner is not None else None,
+                 "tracker": lambda: shared.__setitem__("rebuild_tr", True)}
+
     def on_tick(tr, cap):                                    # runs in the vision loop: changes that must happen there
+        if shared.get("rebuild_tr") and hasattr(tr, "rebuild_geometry"):
+            shared["rebuild_tr"] = False
+            tr.rebuild_geometry()
         if planner is not None and getattr(tr, "tape_poly", None) is None and hasattr(tr, "set_tape"):
             tr.set_tape(planner.arena.poly)                  # lets a red balloon be told from the red tape
         v = shared.get("fov")
@@ -454,6 +469,32 @@ def main(argv=None):
                 return {"error": str(e)}
             log("WARN", f"Experiment {c.get('id')}: {v}")
             return {"ok": True, "value": v}
+        if k == "settings_list":
+            return {"ok": True, "settings": settings.listing(), "saved_file": os.path.exists(settings.SETTINGS_FILE)}
+        if k == "setting":
+            try:
+                r = settings.apply(str(c.get("key")), c.get("value"), set_hooks)
+            except (KeyError, ValueError, TypeError) as e:
+                return {"error": str(e)}
+            log("WARN", f"Setting {c.get('key')} = {r['value']}" + (" (restart needed)" if r["restart"] else ""))
+            return {"ok": True, **r}
+        if k == "setting_reset":
+            try:
+                settings.reset_one(str(c.get("key")), set_hooks)
+            except KeyError as e:
+                return {"error": str(e)}
+            return {"ok": True}
+        if k == "settings_reset_all":
+            settings.reset_all(set_hooks)
+            log("INFO", "All settings back to the defaults in the code (not saved until you press Save)")
+            return {"ok": True}
+        if k == "settings_save":
+            try:
+                n = settings.save()
+            except OSError as e:
+                return {"error": f"could not write {settings.SETTINGS_FILE}: {e}"}
+            log("INFO", f"Saved {n} changed setting(s) to {settings.SETTINGS_FILE}")
+            return {"ok": True, "saved": n}
         if k == "experiments_reset":
             experiments.reset()
             log("INFO", "All experiments back to their defaults")

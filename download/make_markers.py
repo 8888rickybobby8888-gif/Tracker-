@@ -80,4 +80,17 @@ def main():
 
 
 if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser(description="Print-ready ArUco markers at true size")
+    ap.add_argument("--size", type=float, default=None, metavar="METRES", help="black-square size of each FOLLOWER marker, e.g. 0.05 for 5 cm (default: MARKER_SIZE in tracker.py)")
+    ap.add_argument("--floor-size", type=float, default=None, metavar="METRES", help="size of the floor marker (default: FLOOR_SIZE in tracker.py)")
+    ap.add_argument("--markers", choices=["post", "top"], default=None, help="post = four follower markers (IDs 0-3, default), top = one flat marker")
+    a = ap.parse_args()
+    tk.set_layout(a.markers or tk.MARKER_LAYOUT)
+    if a.size:
+        tk.MARKER_SIZE = a.size
+    if a.floor_size:
+        tk.FLOOR_SIZE = a.floor_size
+    print(f"Layout {tk.MARKER_LAYOUT}: follower markers {sorted(tk.FACES)} at {tk.MARKER_SIZE * 100:.1f} cm, floor marker {tk.FLOOR_ID} at {tk.FLOOR_SIZE * 100:.0f} cm. "
+          f"Remember to set MARKER_SIZE (tracker.py or the Settings page) to the size you print.")
     main()

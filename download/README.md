@@ -6,7 +6,7 @@
 One-time setup:
 
     pip install -r requirements.txt             # opencv-contrib, numpy, micromelon, pillow
-    python make_markers.py                      # print markers_sheet.pdf at 100%; floor marker ID 8, follower marker ID 0
+    python make_markers.py --size 0.05          # print markers_sheet.pdf at 100%; floor marker ID 8, follower markers IDs 0-3 (four faces of a post)
     python tracker.py --list                    # find the external camera (press Y on the right one)
     python scan_arena.py --camera 1             # saves arena.json (tape + no-go square); or mark_arena.py to click the corners
 
@@ -59,7 +59,7 @@ It is also kinder than the full renderer for the hunter case: judge changes on `
 ---
 
 No robot control, no chessboard calibration.
-- FOLLOWER: one ArUco marker lying flat on top -> position + yaw
+- FOLLOWER: FOUR ArUco markers (IDs 0-3) on the four faces of a post on the rover -> position + yaw (`--markers top` uses one flat marker instead)
 - LEADER: a coloured balloon (colour only) -> position on the floor
 Outputs ONE number: the yaw to the leader (degrees the follower must turn to face it,
 + = left/CCW, - = right, 0 = pointing straight at it), with an overlay.
@@ -73,11 +73,14 @@ measure the black square with a ruler. Regenerate with `python make_markers.py` 
 - ID 8: the floor marker (15 cm), lying flat on the floor and TAPED DOWN: it is the world origin and every position is
   measured from it. The camera does NOT have to stay still: it re-solves the origin and angle from this marker on
   every frame, so keep it in view and make it big (a bigger floor marker gives a steadier origin).
-- ID 0: the follower's marker. Stick it flat on top of the rover (stiff card, matte) with its TOP EDGE pointing to the
-  rover's FRONT. Make it as big as the top surface allows: bigger = more accurate yaw.
-- Camera view: this works best when the external camera looks down from above. At an angle (like 45 degrees) it still
-  works but yaw gets noisier, so use the biggest marker that fits (10 cm is much better than 5 cm), or switch
-  `MARKER_LAYOUT` to `"post"` in tracker.py for a four-faced post and a low side-on camera.
+- IDs 0, 1, 2, 3: the follower's FOUR markers (the default layout, `--markers post`). Build a small post or block on top of the rover and stick one marker on
+  each of its four faces, each leaning BACK about 20 degrees (`TILT_DEG`) so a camera above sees them well:
+  ID 0 = FRONT, ID 1 = LEFT, ID 2 = BACK, ID 3 = RIGHT (counter-clockwise seen from above). The marker centres sit `MARKER_HEIGHT` (8 cm) above the floor and
+  `POST_RADIUS` (4 cm) from the rover's centre; measure yours and set those two in tracker.py. Every marker has the same size, `MARKER_SIZE` (4 to 6 cm works:
+  see "Marker requirements"). Any one or two faces seen is enough, and when several are seen they are averaged, so the heading survives a hand or a robot covering one.
+  Each face's two look-alike poses are told apart by which one leaves the rover standing upright, which removed the 20 to 30 degree heading flips.
+- One flat marker instead (`--markers top`, ID 0): stick it flat on top of the rover (stiff card, matte) with its TOP EDGE pointing to the rover's FRONT, as big as the top allows.
+- Camera view: this works from above or from the side. The four-marker layout stays within about 1 to 4 degrees of heading error from the camera positions I tried in the simulator.
 
 ## 2. Set values at the top of tracker.py
 - MARKER_SIZE, FLOOR_SIZE: printed black-square side length, metres
@@ -310,6 +313,22 @@ Switch: the dashboard's Experiments panel ("Red balloon guard"). The onboard cam
 - Flat and matte (glare kills it), in focus, not tilted: the heading assumes the marker lies horizontal at `MARKER_HEIGHT`. Seen no more than about 70 degrees off the camera axis.
 - Floor marker (15 cm, ID 8): flat on the floor, always in view (its pose is re-solved every frame), camera well above the floor.
 - Simulator, 1280x720, camera 1.8 m away: 3 cm to 8 cm all detected with 0.4 to 2 degrees of heading error (a perfect simulated picture: a real one needs the margins above). At 640x480 it was erratic below 6 cm.
+
+## The Settings page (every variable, saved to settings.json)
+Dashboard header > **Settings** (or http://127.0.0.1:8765/settings). It lists about 95 variables in groups with a slider, a number box, the unit, a plain-English help line,
+the default, and a **Reset** per row: your rover and arena (marker sizes and height, post radius, balloon height, rover radius ... **measure these**), camera and tracking,
+pop geometry, speed and timing, the rear lidar, chaser detection, facing, boundary escape, the route planner, heading and dead reckoning, the onboard camera. The
+Experiments switches are at the top of the same page, and there is a search box. Changes apply on the next step (a few are tagged RESTART). **Save to settings.json** writes
+the values that differ from the defaults, and `follow.py` loads that file at start, so your calibration survives a restart. The list is in `settings.py`.
+
+## Follower markers: four on a post (default) and how to print them
+```
+python make_markers.py --size 0.05      # IDs 0 (front) 1 (left) 2 (back) 3 (right) at 5 cm each, plus floor marker 8 at 15 cm -> markers_sheet.pdf, print at 100%
+```
+Set `MARKER_SIZE` (tracker.py or the Settings page) to the size you printed (default 5 cm), measure `MARKER_HEIGHT` (floor to the marker centres) and `POST_RADIUS` (rover centre to a face).
+`python follow.py --markers top` uses one flat marker instead (`python make_markers.py --markers top --size 0.08`).
+Simulator check of the four-marker layout (6 cm markers, static rover, camera moved to four very different positions): heading within 1.5 degrees; the plain solve was off by up to 29.
+In the full renderer with four 5 cm faces: `chase_around` 7.5 s, `start_beside_nogo` 11.7 s, `three_calm` all popped in 18.4 s, no line crossings; the simulator's tuned `hunter` results were made with the flat marker and were not re-measured.
 
 ## Tandem: external camera + the follower's own camera (untested on hardware)
 ```
