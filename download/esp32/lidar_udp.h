@@ -36,8 +36,15 @@
 #include <esp_wifi.h>
 #endif
 
-#define LIDAR_SDA 13            // CHANGE to free pins on your board
+#ifndef LIDAR_SDA
+#define LIDAR_SDA 13            // CHANGE to free pins on your board (the rover_esp32 sketch sets its own before including this file)
+#endif
+#ifndef LIDAR_SCL
 #define LIDAR_SCL 32
+#endif
+#ifndef LIDAR_WIRE
+#define LIDAR_WIRE Wire         // the rover_esp32 sketch uses Wire1 so the camera keeps I2C port 0 to itself
+#endif
 #define LIDAR_UDP_PORT 4210     // must match --lidar-port in follow.py
 #define LIDAR_GRID 8            // 4 = 4x4 zones (up to 60 Hz), 8 = 8x8 zones (15 Hz). MUST match GRID in evade.py
 #define LIDAR_HZ 15             // 8x8 allows up to 15 Hz (4x4 up to 60 Hz: use 30 there)
@@ -63,10 +70,10 @@ inline void lidarBegin() {
     else Serial.println("ESP-NOW: sending lidar by broadcast on channel " + String(LIDAR_ESPNOW_CHANNEL));
   }
 #endif
-  Wire.begin(LIDAR_SDA, LIDAR_SCL);
-  Wire.setClock(400000);
+  LIDAR_WIRE.begin(LIDAR_SDA, LIDAR_SCL);
+  LIDAR_WIRE.setClock(400000);
   Serial.println("Lidar: starting (firmware upload can take a few seconds)...");
-  if (!lidarDev.begin(0x29, Wire)) {
+  if (!lidarDev.begin(0x29, LIDAR_WIRE)) {
     Serial.println("Lidar: NOT FOUND. Check wiring and power.");
     return;
   }

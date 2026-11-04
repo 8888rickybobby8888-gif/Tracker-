@@ -237,21 +237,31 @@ point behind the target (where your pin meets its balloon). Close to that point 
   are clamped, not an error.
 - If the opponent is hardly moving its heading is unknown, so it aims at the opponent itself (the front, possibly).
 
-## Connecting the rover's ESP32 to a WiFi hotspot (the WiFi route; untested on hardware)
-The ESP32 joins the hotspot as an ordinary WiFi client. The repo's files don't do the joining: the stock `CameraWebServer` example does, and
-`lidar_udp.h` plugs into it.
+## The ESP32 program (one sketch: camera + lidar over WiFi; untested on hardware)
+Folder `rover_esp32/` (copy it whole, the folder name must match the .ino name): `rover_esp32.ino` + `lidar_udp.h`. It serves the camera at
+`http://<ip>:81/stream` and broadcasts the lidar on UDP port 4210.
 1. Make a **2.4 GHz** hotspot (the computer's mobile hotspot or a phone's). The ESP32 cannot use 5 GHz.
-2. Arduino IDE: *File > Examples > ESP32 > Camera > CameraWebServer*. At the top set `const char* ssid = "YourHotspot";` and
-   `const char* password = "YourPassword";`, and pick your camera model.
-3. Add `lidar_udp.h` to that sketch folder and make the three small edits described at the top of the file (`lidarBegin()` in `setup()`,
-   the lidar send in `loop()`).
-4. Flash it and open the Serial Monitor at 115200 baud. On boot it prints the board's address: `Camera Ready! Use 'http://192.168.x.x'`.
-5. Put the computer on the same hotspot (if the hotspot is on the computer, it already is).
-6. Run `python follow.py --camera 1 --onboard http://192.168.x.x:81/stream` (camera stream = port 81).
+2. Arduino IDE: Boards Manager > install **esp32 by Espressif Systems**; Library Manager > install **SparkFun VL53L5CX Arduino Library**.
+3. Open `rover_esp32/rover_esp32.ino`. Edit `WIFI_SSID`, `WIFI_PASS`, the camera model (`CAMERA_MODEL_AI_THINKER` is the common ESP32-CAM) and the lidar pins.
+4. Tools > Board: **AI Thinker ESP32-CAM** (or **ESP32 Wrover Module**), PSRAM: Enabled, Partition scheme: Huge APP, Upload speed: 115200.
+5. Upload, open the Serial Monitor at 115200. It prints `Camera stream: http://192.168.x.x:81/stream`.
+6. Put the computer on the same hotspot, then: `python follow.py --camera 1 --onboard http://192.168.x.x:81/stream`.
 
-The lidar needs nothing more: it broadcasts UDP on port 4210 and `follow.py` listens there by default. If the hotspot blocks broadcast (some
-phone hotspots do), set `LIDAR_DEST` in `lidar_udp.h` to the computer's IP. The board's address can change on each reconnect: reserve a fixed
-address for it in the hotspot's settings if you can. Tandem details and WiFi vs ESP-NOW: `docs/WIFI_VS_ESPNOW.md`.
+The lidar needs nothing more: `follow.py` listens on UDP port 4210. If the hotspot blocks broadcast (some phones do), set `LIDAR_DEST` in `lidar_udp.h`
+to the computer's IP. Reserve a fixed address for the board in the hotspot's settings if you can.
+
+### Board not detected by the Arduino IDE (no port under Tools > Port)
+1. **Cable:** use a DATA cable. Many micro-USB / USB-C cables only charge. Try another cable and another USB port (no hub).
+2. **The ESP32-CAM (AI-Thinker) has NO USB socket and no USB chip.** It needs either its **ESP32-CAM-MB** base board (micro-USB), or a USB-to-serial
+   adapter (FTDI / CP2102 / CH340, set to 3.3 V logic): adapter GND-GND, 5V-5V, TX-U0R, RX-U0T, and **IO0-GND while uploading** (remove it and press RST to run).
+3. **Driver:** the USB chip needs a driver on Windows/macOS. Look at the small chip next to the USB socket: `CH340` or `CH9102` (WCH driver), `CP2102` (Silicon Labs
+   CP210x driver), `FT232` (FTDI). Windows: Device Manager > Ports (COM & LPT) shows `USB-SERIAL ... (COM5)` when it works; an "Unknown device" means no driver.
+   Linux: `ls /dev/ttyUSB* /dev/ttyACM*`, and `sudo usermod -a -G dialout $USER` then log out and in.
+4. **Boards package:** Boards Manager must have **esp32 by Espressif Systems** installed (add
+   `https://espressif.github.io/arduino-esp32/package_esp32_index.json` under File > Preferences > Additional boards manager URLs), then Tools > Board > esp32.
+5. **The port shows but upload says "Failed to connect":** hold the **BOOT** button (or hold IO0 to GND) when "Connecting..." appears and release when it starts; lower Upload Speed to 115200;
+   power the board from a good 5 V source (the camera board browns out on a weak USB port).
+6. **Nothing appears at all:** unplug, hold BOOT, plug in again; check Device Manager for any new device; try another computer to see whether the board or the PC is the problem.
 
 ## The dashboard (the control screen; untested on the real rover)
 `python follow.py --camera 1` now opens a **browser dashboard** (http://127.0.0.1:8765/, opened for you) instead of the plain OpenCV window:

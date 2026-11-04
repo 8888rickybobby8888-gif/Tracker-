@@ -2,8 +2,8 @@ WHAT IS IN THIS FOLDER
   *.py                 run on the COMPUTER (Python 3). Install once:  pip install -r requirements.txt
   my_chase.py          YOUR chase code (edit this one)
   markers/             print marker_0 (on the follower) and marker_8 (flat on the floor); markers_sheet.pdf has both
-  esp32/               flash onto the ESP32 (Arduino IDE): lidar_udp.h goes in the CameraWebServer sketch folder
-                       (see the top of that file); espnow_bridge/ and cam_espnow.h are only for the optional ESP-NOW route
+  esp32/rover_esp32/   THE ESP32 PROGRAM: open rover_esp32.ino in the Arduino IDE, edit WIFI_SSID / WIFI_PASS, upload (steps at the top of the file and in README.md,
+                       including what to do when the IDE cannot see the board). The rest of esp32/ (espnow_bridge/, cam_espnow.h, lidar_test.ino) is optional
   docs/                WIFI_VS_ESPNOW.md (setup + comparison), CODE_TOUR.md, EXPERIMENTS.md
   README.md            Quick start and every option. HANDOFF.md = project state.
 
