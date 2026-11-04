@@ -13,9 +13,12 @@
        (File > Preferences > Additional boards manager URLs:
         https://espressif.github.io/arduino-esp32/package_esp32_index.json )
     2. Library Manager: install "SparkFun VL53L5CX Arduino Library".
-    3. Tools > Board > esp32 > "AI Thinker ESP32-CAM"   (or "ESP32 Wrover Module" for a WROVER board)
-       Tools > PSRAM: Enabled          Tools > Partition Scheme: "Huge APP (3MB No OTA/1MB SPIFFS)"
-       Tools > Upload Speed: 115200 (slower is more reliable)
+    3. ESP32-S3 WROOM-1 board (two USB-C sockets):  Tools > Board > esp32 > "ESP32S3 Dev Module"
+         Tools > PSRAM: "OPI PSRAM" for an N16R8 module, "QSPI PSRAM" for N8R2 / N4R2 (the name printed on the module tells you)
+         Tools > Flash Size: to match the module (N16 = 16MB, N8 = 8MB)   Tools > Partition Scheme: "Huge APP (3MB No OTA/1MB SPIFFS)"
+         Tools > USB CDC On Boot: Disabled if you plug into the socket marked UART / COM, Enabled if you plug into the one marked USB
+         Tools > Upload Speed: 115200 (slower is more reliable)
+       ESP32-CAM (AI-Thinker) instead:  Board "AI Thinker ESP32-CAM", PSRAM Enabled, same partition scheme.
     4. Edit WIFI_SSID / WIFI_PASS below (a 2.4 GHz network: the ESP32 cannot use 5 GHz) and the camera model.
     5. Upload, open Serial Monitor at 115200: it prints the address, e.g.  Camera stream: http://192.168.4.23:81/stream
     The IDE cannot see the board? See "Board not detected" in README.md (cable, driver, adapter, boot mode).
@@ -30,18 +33,43 @@
 const char* WIFI_SSID = "YourHotspot";
 const char* WIFI_PASS = "YourPassword";
 
-#define CAMERA_MODEL_AI_THINKER        // the common "ESP32-CAM". For an ESP32-WROVER-KIT style board use CAMERA_MODEL_WROVER_KIT instead
-// #define CAMERA_MODEL_WROVER_KIT
+// Pick ONE camera model (the pins of the camera socket on your board):
+#define CAMERA_MODEL_ESP32S3_EYE       // ESP32-S3 WROOM-1 camera boards (Espressif ESP32-S3-EYE, Freenove ESP32-S3 WROOM CAM and most look-alikes with a DVP camera socket)
+// #define CAMERA_MODEL_AI_THINKER     // the common ESP32-CAM
+// #define CAMERA_MODEL_WROVER_KIT     // ESP32-WROVER-KIT style board
+// THE S3 PINS ARE THE COMMON ONES, NOT CHECKED AGAINST YOUR BOARD. If "Camera init FAILED" appears, compare them with your board's schematic.
 
-// Lidar I2C pins: two FREE pins. AI-Thinker: 14 and 15 are free if you do not use the SD card. Avoid 0, 2, 12 (boot), 6-11 (flash), 16 (PSRAM).
-#define LIDAR_SDA 14
+// Lidar I2C pins: two FREE pins (not the camera's, not flash/PSRAM, not USB 19/20, not the boot pins 0/3/45/46).
+#if defined(CAMERA_MODEL_ESP32S3_EYE)
+#define LIDAR_SDA 41                   // free on most S3 boards (also JTAG pins, fine unless you debug with JTAG). Other candidates: 1, 2, 14, 47, 48
+#define LIDAR_SCL 42
+#else
+#define LIDAR_SDA 14                   // AI-Thinker: 14 and 15 are free if you do not use the SD card
 #define LIDAR_SCL 15
-#define LIDAR_WIRE Wire1               // the camera driver keeps I2C port 0 (pins 26/27) to itself
+#endif
+#define LIDAR_WIRE Wire1               // the camera driver keeps one I2C port to itself
 // ========================================================================
 
 #include "lidar_udp.h"
 
-#if defined(CAMERA_MODEL_AI_THINKER)
+#if defined(CAMERA_MODEL_ESP32S3_EYE)
+#define PWDN_GPIO_NUM -1
+#define RESET_GPIO_NUM -1
+#define XCLK_GPIO_NUM 15
+#define SIOD_GPIO_NUM 4
+#define SIOC_GPIO_NUM 5
+#define Y9_GPIO_NUM 16
+#define Y8_GPIO_NUM 17
+#define Y7_GPIO_NUM 18
+#define Y6_GPIO_NUM 12
+#define Y5_GPIO_NUM 10
+#define Y4_GPIO_NUM 8
+#define Y3_GPIO_NUM 9
+#define Y2_GPIO_NUM 11
+#define VSYNC_GPIO_NUM 6
+#define HREF_GPIO_NUM 7
+#define PCLK_GPIO_NUM 13
+#elif defined(CAMERA_MODEL_AI_THINKER)
 #define PWDN_GPIO_NUM 32
 #define RESET_GPIO_NUM -1
 #define XCLK_GPIO_NUM 0
@@ -76,7 +104,7 @@ const char* WIFI_PASS = "YourPassword";
 #define HREF_GPIO_NUM 23
 #define PCLK_GPIO_NUM 22
 #else
-#error "Pick a camera model above (CAMERA_MODEL_AI_THINKER or CAMERA_MODEL_WROVER_KIT)"
+#error "Pick a camera model above (CAMERA_MODEL_ESP32S3_EYE, CAMERA_MODEL_AI_THINKER or CAMERA_MODEL_WROVER_KIT)"
 #endif
 
 #define STREAM_BOUNDARY "123456789000000000000987654321"
@@ -105,14 +133,14 @@ static bool cameraInit() {
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = FRAMESIZE_VGA;          // 640x480; follow.py's field of view setting assumes the picture is this wide or any other: only the ratio matters
+  config.frame_size = FRAMESIZE_VGA;          // 640x480 (only the picture's shape matters to follow.py)
   config.jpeg_quality = 12;                   // 10 (best) .. 63 (smallest)
   config.fb_count = psramFound() ? 2 : 1;
   config.fb_location = psramFound() ? CAMERA_FB_IN_PSRAM : CAMERA_FB_IN_DRAM;
   config.grab_mode = CAMERA_GRAB_LATEST;      // always the newest picture, never a queue of old ones
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
-    Serial.printf("Camera init FAILED (0x%x). Check the camera model, the ribbon cable and the 5 V supply.\n", err);
+    Serial.printf("Camera init FAILED (0x%x). Check: PSRAM enabled in Tools, the camera model above (pins), the camera ribbon fully seated, a good USB supply.\n", err);
     return false;
   }
   return true;
@@ -178,6 +206,7 @@ static void connectWifi() {
 void setup() {
   Serial.begin(115200);
   Serial.setDebugOutput(false);
+  delay(1500);                                // lets a native-USB Serial Monitor connect before the first lines
   Serial.println("\nrover_esp32 starting");
   cameraOk = cameraInit();
   connectWifi();

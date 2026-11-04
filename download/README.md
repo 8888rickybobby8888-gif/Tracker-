@@ -242,8 +242,8 @@ Folder `rover_esp32/` (copy it whole, the folder name must match the .ino name):
 `http://<ip>:81/stream` and broadcasts the lidar on UDP port 4210.
 1. Make a **2.4 GHz** hotspot (the computer's mobile hotspot or a phone's). The ESP32 cannot use 5 GHz.
 2. Arduino IDE: Boards Manager > install **esp32 by Espressif Systems**; Library Manager > install **SparkFun VL53L5CX Arduino Library**.
-3. Open `rover_esp32/rover_esp32.ino`. Edit `WIFI_SSID`, `WIFI_PASS`, the camera model (`CAMERA_MODEL_AI_THINKER` is the common ESP32-CAM) and the lidar pins.
-4. Tools > Board: **AI Thinker ESP32-CAM** (or **ESP32 Wrover Module**), PSRAM: Enabled, Partition scheme: Huge APP, Upload speed: 115200.
+3. Open `rover_esp32/rover_esp32.ino`. Edit `WIFI_SSID`, `WIFI_PASS`, the camera model (default `CAMERA_MODEL_ESP32S3_EYE` for ESP32-S3 WROOM-1 camera boards; the S3 pins are the common ones and are not checked against your board) and the lidar pins.
+4. **ESP32-S3 WROOM-1 board (two USB-C sockets):** Tools > Board > **ESP32S3 Dev Module**; PSRAM: **OPI PSRAM** for an N16R8 module (QSPI for N8R2 / N4R2); Flash Size to match (N16 = 16MB); Partition scheme: Huge APP; **USB CDC On Boot**: Disabled when plugged into the UART/COM socket, Enabled for the USB socket; Upload speed 115200. (ESP32-CAM: Board **AI Thinker ESP32-CAM**, PSRAM Enabled.)
 5. Upload, open the Serial Monitor at 115200. It prints `Camera stream: http://192.168.x.x:81/stream`.
 6. Put the computer on the same hotspot, then: `python follow.py --camera 1 --onboard http://192.168.x.x:81/stream`.
 
@@ -251,6 +251,7 @@ The lidar needs nothing more: `follow.py` listens on UDP port 4210. If the hotsp
 to the computer's IP. Reserve a fixed address for the board in the hotspot's settings if you can.
 
 ### Board not detected by the Arduino IDE (no port under Tools > Port)
+0. **Two USB-C sockets (an ESP32-S3 board):** plug into the one marked **UART/COM** first (it has a USB-to-serial chip, so it shows as a COM port). The one marked **USB** is the chip's own USB: it only shows up reliably in bootloader mode (hold **BOOT**, tap **RESET**, release **BOOT**) and needs *USB CDC On Boot: Enabled*.
 1. **Cable:** use a DATA cable. Many micro-USB / USB-C cables only charge. Try another cable and another USB port (no hub).
 2. **The ESP32-CAM (AI-Thinker) has NO USB socket and no USB chip.** It needs either its **ESP32-CAM-MB** base board (micro-USB), or a USB-to-serial
    adapter (FTDI / CP2102 / CH340, set to 3.3 V logic): adapter GND-GND, 5V-5V, TX-U0R, RX-U0T, and **IO0-GND while uploading** (remove it and press RST to run).
