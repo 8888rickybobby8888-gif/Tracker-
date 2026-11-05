@@ -631,7 +631,7 @@ class Cam:
 
 def _open_raw(index):
     """Open camera `index`; on Windows try DirectShow first, then the default backend."""
-    backends = [cv2.CAP_DSHOW, cv2.CAP_ANY] if sys.platform.startswith("win") else [cv2.CAP_ANY]
+    backends = [cv2.CAP_DSHOW, cv2.CAP_ANY] if (sys.platform.startswith("win") and not isinstance(index, str)) else [cv2.CAP_ANY]
     for be in backends:
         cap = cv2.VideoCapture(index, be)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_SIZE[0])
@@ -641,6 +641,25 @@ def _open_raw(index):
             return cap, frame
         cap.release()
     return None, None
+
+
+def camera_arg(text):
+    """A --camera value: a number (0, 1, 2 ...) or a URL / file path (a phone's IP camera, an RTSP or MJPEG stream, a video file)."""
+    return int(text) if str(text).strip().isdigit() else str(text)
+
+
+def scan_cameras(max_index=10):
+    """Non-interactive: try camera 0..max_index-1, print which open and their size, and save camera_N.jpg so you can SEE which is which."""
+    found = []
+    for i in range(max_index):
+        cap, frame = _open_raw(i)
+        if cap is None:
+            continue
+        cap.release()
+        cv2.imwrite(f"camera_{i}.jpg", frame)
+        found.append(i)
+        print(f"camera {i}: {frame.shape[1]}x{frame.shape[0]}  (picture saved as camera_{i}.jpg: open it to see which camera this is)")
+    print(f"\nUse one with:  python follow.py --camera {found[0]}" if found else "No cameras found.")
 
 
 def open_camera(index=None, flip=None):
@@ -821,11 +840,14 @@ def main(camera=None, flip=None, on_yaw=None, on_state=None, on_draw=None, on_ke
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description="Follower yaw-to-leader tracker")
-    ap.add_argument("--camera", type=int, help="camera index (default: CAMERA_INDEX in the file)")
+    ap.add_argument("--camera", type=camera_arg, help="camera index, or a URL / file for an IP camera (default: CAMERA_INDEX in the file)")
     ap.add_argument("--list", action="store_true", help="preview each camera to find the right index")
+    ap.add_argument("--scan", action="store_true", help="list every camera that opens, with its size, and save camera_N.jpg for each")
     ap.add_argument("--flip", action="store_true", help="mirror the image horizontally")
     args = ap.parse_args()
-    if args.list:
+    if args.scan:
+        scan_cameras()
+    elif args.list:
         pick_camera()
     else:
         main(args.camera, True if args.flip else None)

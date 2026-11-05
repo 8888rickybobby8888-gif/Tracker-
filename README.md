@@ -339,6 +339,12 @@ Set `MARKER_SIZE` (tracker.py or the Settings page) to the size you printed (def
 Simulator check of the four-marker layout (6 cm markers, static rover, camera moved to four very different positions): heading within 1.5 degrees; the plain solve was off by up to 29.
 In the full renderer with four 5 cm faces: `chase_around` 7.5 s, `start_beside_nogo` 11.7 s, `three_calm` all popped in 18.4 s, no line crossings; the simulator's tuned `hunter` results were made with the flat marker and were not re-measured.
 
+## Choosing the external camera
+`python follow.py --camera N`: N is the camera's number. Not sure which? `python tracker.py --scan` tries cameras 0 to 9, prints the ones that open with their size and
+saves `camera_0.jpg`, `camera_1.jpg` ... so you can open the pictures and see which is which (`python tracker.py --list` previews them live instead). Close other apps that use
+the camera (the Windows Camera app, Teams, a browser tab). `--camera` also takes a URL, so a phone or IP camera works: `--camera http://192.168.1.20:8080/video`.
+The ESP32's own camera is separate: that is `--onboard http://<ip>:81/stream`.
+
 ## Tandem: external camera + the follower's own camera (untested on hardware)
 ```
 python follow.py --camera 1 --onboard http://<esp32>:81/stream

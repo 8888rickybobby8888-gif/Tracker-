@@ -844,6 +844,9 @@ pl.NOGO_MARGIN_M = 0.25; _pla.rebuild()
 check("planner.rebuild: the keep-out grows when the margin is raised", not np.array_equal(np.asarray(_pla.block_threat), np.asarray(_before)), "")
 pl.NOGO_MARGIN_M = 0.13
 
+
+check("tracker.camera_arg: a number is a camera index, anything else is a URL / path", _tkc.camera_arg("2") == 2 and _tkc.camera_arg("http://192.168.1.5:8080/video") == "http://192.168.1.5:8080/video", "")
+
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]
 for r_ in failed:

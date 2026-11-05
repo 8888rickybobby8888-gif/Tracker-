@@ -52,6 +52,10 @@ ROVER_ID = 1                      # YOUR rover's number (the ID on the rover / i
 
 
 
+def _camera_arg(text):
+    return int(text) if str(text).strip().isdigit() else str(text)
+
+
 def _publish(yaw, target_yaw="same"):      # called by the vision code every frame
     global yaw_to_leader, yaw_to_target
     yaw_to_leader = yaw
@@ -99,7 +103,7 @@ def main(argv=None):
     ap.add_argument("--onboard", metavar="SOURCE",
                     help="use the follower's own camera (ESP32 stream URL or index, or the word 'bridge' for frames sent through the ESP-NOW "
                          "bridge: needs --lidar-serial) instead of the external camera")
-    ap.add_argument("--camera", type=int)
+    ap.add_argument("--camera", type=_camera_arg, help="the EXTERNAL camera: its number (python tracker.py --scan lists them), or a URL for an IP camera / phone")
     ap.add_argument("--flip", action="store_true")
     ap.add_argument("--rover", type=int, default=ROVER_ID, help=f"rover ID for Bluetooth (default ROVER_ID at the top of follow.py = {ROVER_ID})")
     ap.add_argument("--lidar-port", type=int, default=4210)
