@@ -28,6 +28,7 @@
 #include <WiFi.h>
 #include "esp_camera.h"
 #include "esp_http_server.h"
+#include "img_converters.h"               // frame2jpg: software JPEG for sensors that cannot produce JPEG themselves
 
 // ============================== EDIT THESE ==============================
 const char* WIFI_SSID = "YourHotspot";
@@ -110,6 +111,8 @@ const char* WIFI_PASS = "YourPassword";
 #define STREAM_BOUNDARY "123456789000000000000987654321"
 
 static bool cameraOk = false;
+static bool softJpeg = false;                 // the sensor cannot make JPEG: take RGB565 and compress it here
+#define SKETCH_VERSION "v3 (camera JPEG fallback + WiFi scan)"
 
 static bool cameraInit() {
   camera_config_t config = {};
@@ -139,10 +142,21 @@ static bool cameraInit() {
   config.fb_location = psramFound() ? CAMERA_FB_IN_PSRAM : CAMERA_FB_IN_DRAM;
   config.grab_mode = CAMERA_GRAB_LATEST;      // always the newest picture, never a queue of old ones
   esp_err_t err = esp_camera_init(&config);
+  if (err == ESP_ERR_NOT_SUPPORTED) {         // "JPEG format is not supported on this sensor" (for example GC0308 / GC2145): compress in software
+    Serial.println("This camera sensor cannot output JPEG: switching to RGB565 + software JPEG (smaller picture, slower).");
+    esp_camera_deinit();
+    config.pixel_format = PIXFORMAT_RGB565;
+    config.frame_size = FRAMESIZE_QVGA;       // 320x240 keeps the software JPEG fast
+    config.fb_count = psramFound() ? 2 : 1;
+    err = esp_camera_init(&config);
+    softJpeg = (err == ESP_OK);
+  }
   if (err != ESP_OK) {
     Serial.printf("Camera init FAILED (0x%x). Check: PSRAM enabled in Tools, the camera model above (pins), the camera ribbon fully seated, a good USB supply.\n", err);
     return false;
   }
+  sensor_t* sen = esp_camera_sensor_get();
+  if (sen) Serial.printf("Camera sensor found: PID 0x%x (OV2640 = 0x26, OV3660 = 0x3660, OV5640 = 0x5640, GC0308 = 0x9b, GC2145 = 0x2145), %s\n", (unsigned)sen->id.PID, softJpeg ? "software JPEG" : "hardware JPEG");
   return true;
 }
 
@@ -154,11 +168,19 @@ static esp_err_t streamHandler(httpd_req_t* req) {
   while (true) {
     camera_fb_t* fb = esp_camera_fb_get();
     if (!fb) { res = ESP_FAIL; break; }
-    size_t hlen = snprintf(part, sizeof(part), "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n", (unsigned)fb->len);
+    uint8_t* jpg = fb->buf;
+    size_t jlen = fb->len;
+    uint8_t* tmp = NULL;
+    if (softJpeg) {                            // RGB565 -> JPEG here (the sensor cannot do it)
+      if (!frame2jpg(fb, 25, &tmp, &jlen)) { esp_camera_fb_return(fb); res = ESP_FAIL; break; }
+      jpg = tmp;
+    }
+    size_t hlen = snprintf(part, sizeof(part), "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n", (unsigned)jlen);
     res = httpd_resp_send_chunk(req, "\r\n--" STREAM_BOUNDARY "\r\n", strlen("\r\n--" STREAM_BOUNDARY "\r\n"));
     if (res == ESP_OK) res = httpd_resp_send_chunk(req, part, hlen);
-    if (res == ESP_OK) res = httpd_resp_send_chunk(req, (const char*)fb->buf, fb->len);
+    if (res == ESP_OK) res = httpd_resp_send_chunk(req, (const char*)jpg, jlen);
     esp_camera_fb_return(fb);
+    if (tmp) free(tmp);
     if (res != ESP_OK) break;                 // the computer closed the stream
   }
   return res;
@@ -245,7 +267,7 @@ void setup() {
   Serial.begin(115200);
   Serial.setDebugOutput(false);
   delay(1500);                                // lets a native-USB Serial Monitor connect before the first lines
-  Serial.println("\nrover_esp32 starting");
+  Serial.println("\nrover_esp32 " SKETCH_VERSION " starting");
   cameraOk = cameraInit();
   connectWifi();
   if (cameraOk) startServer();

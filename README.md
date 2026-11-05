@@ -253,6 +253,15 @@ Folder `rover_esp32/` (copy it whole, the folder name must match the .ino name):
 The lidar needs nothing more: `follow.py` listens on UDP port 4210. If the hotspot blocks broadcast (some phones do), set `LIDAR_DEST` in `lidar_udp.h`
 to the computer's IP. Reserve a fixed address for the board in the hotspot's settings if you can.
 
+### Serial Monitor lines and what they mean (rover_esp32)
+- `rover_esp32 v3 (...) starting` : the version line. **If you do not see "v3", you flashed an OLD copy: re-upload the sketch from the newest download.zip.**
+- `E (...) camera: JPEG format is not supported on this sensor` : the camera was found (so the pins are right) but this sensor cannot output JPEG (GC0308 / GC2145 type).
+  v3 switches to RGB565 and compresses to JPEG in software (320x240, slower, a few frames a second less). It then prints `Camera sensor found: PID 0x...`.
+- `Camera init FAILED (0x...)` : check Tools > PSRAM, the camera model and pins in the sketch, and that the camera ribbon is fully seated.
+- **A Windows PC as the hotspot** (names like `LOGANS_SURFACE 7169`): Windows shares the band of the network it gets its internet from, so a PC on 5 GHz Wi-Fi makes a 5 GHz hotspot
+  the ESP32 cannot see. Settings > Network & internet > Mobile hotspot > Edit > Network band: **2.4 GHz**. If that is not offered, connect the PC to a 2.4 GHz network first, or use a phone hotspot
+  (set to 2.4 GHz) for both the PC and the ESP32.
+
 ### The ESP32 will not connect to the hotspot
 After 15 s the sketch prints a **scan** of the networks it can see and says which case you are in (Serial Monitor, 115200 baud).
 - **Your hotspot is not in the list:** it is probably 5 GHz only. The ESP32 only does **2.4 GHz**. iPhone: Personal Hotspot > turn on *Maximize Compatibility*.
