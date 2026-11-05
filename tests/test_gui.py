@@ -87,6 +87,18 @@ tk.main(0, None, headless=True, on_preview=lambda fr: prev.append(fr.shape),
 tk.LOCK_PREVIEW = False
 check("tracker.main headless: the camera picture is handed out while it looks for the floor marker, then every frame", len(prev) >= 3 and len(frames_seen) >= 5, f"{len(prev)} preview, {len(frames_seen)} frames")
 
+# ---------------- 1d. the external camera is switched while running (the dashboard's camera box) ----------------
+swapped, got = [], []
+class _FC2(FakeCam): pass
+def _tick(tr, cap):
+    if len(got) == 6 and not swapped:
+        swapped.append(1)
+        return (_FC2(), sw.SIZE)
+    return None
+tk.LOCK_PREVIEW = False
+tk.main(0, None, headless=True, on_frame=lambda frame, raw, tr, st: got.append(1), should_stop=lambda: len(got) >= 16, on_tick=_tick)
+check("tracker.main: on_tick can hand over a NEW camera; it looks for the floor marker again and carries on", swapped and len(got) >= 16, f"{len(got)} frames, swapped={bool(swapped)}")
+
 # ---------------- 1b. tracker.main: the pause key (P / space) and the status line ----------------
 pk = {"paused": False, "keys": [], "msgs": []}
 def _on_key(k):

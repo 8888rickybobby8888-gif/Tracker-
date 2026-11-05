@@ -221,12 +221,37 @@ def main(argv=None):
         import onboard
         jpeg_src = onboard.JpegFrameSource()
     feed = None
-    if tandem:
+    links = {"onboard": args.onboard or "", "external": str(args.camera) if args.camera is not None else ""}
+    LINKS_FILE = "links.json"
+    try:                                                      # the links you pasted last time prefill the dashboard's boxes
+        saved = json.load(open(LINKS_FILE))
+        for k in ("onboard", "external"):
+            if not links[k] and isinstance(saved.get(k), str):
+                links[k] = saved[k]
+    except (OSError, ValueError):
+        pass
+
+    def start_onboard(source, cam=None):
+        """Start (or restart) the rover-camera feed: the stream at `source`, or an already made camera object (the ESP-NOW bridge)."""
+        nonlocal feed
+        stop_onboard()
         import onboard
         import tracker as _trk
-        cam = jpeg_src if jpeg_src is not None else onboard.LatestFrame(args.onboard)
-        feed = onboard.OnboardFeed(cam, onboard.MultiTracker(_trk.OPPONENT_HSV),
-                                   lambda b, t: pipe.on_onboard(b, time.time()))
+        c = cam if cam is not None else onboard.LatestFrame(source)
+        feed = onboard.OnboardFeed(c, onboard.MultiTracker(getattr(_trk, "OPPONENT_HSV", {"A": [((100, 120, 60), (130, 255, 255))]})), lambda b, t: pipe.on_onboard(b, time.time()))
+
+    def stop_onboard():
+        nonlocal feed
+        if feed is not None:
+            try:
+                feed.close()
+                feed.cam.release()
+            except Exception:
+                pass
+            feed = None
+
+    if tandem:
+        start_onboard(args.onboard, cam=jpeg_src)
         print("TANDEM: external camera = primary, the follower's own camera sharpens the facing when the marker is hidden.")
     lid = {"vals": None, "n": 0, "t0": time.time()}
 
@@ -305,6 +330,9 @@ def main(argv=None):
         if shared.get("rebuild_tr") and hasattr(tr, "rebuild_geometry"):
             shared["rebuild_tr"] = False
             tr.rebuild_geometry()
+        new_cam = shared.pop("new_cam", None)
+        if new_cam is not None:
+            return new_cam                                    # tracker.main swaps to it and looks for the floor marker again
         if planner is not None and getattr(tr, "tape_poly", None) is None and hasattr(tr, "set_tape"):
             tr.set_tape(planner.arena.poly)                  # lets a red balloon be told from the red tape
         v = shared.get("fov")
@@ -445,7 +473,7 @@ def main(argv=None):
                 slots[sl] = {"swatch": sw, "hue": hue, "status": status}
         floor_flags = list(pipe._floor_flags) if (read_floor is not None and getattr(pipe, "_floor_flags", None) is not None) else None
         ir = {"left": ir_cache["left"], "right": ir_cache["right"], "age": now - ir_cache["t"]} if ir_cache["left"] is not None else None
-        return {"now": now, "tandem": tandem,
+        return {"now": now, "tandem": feed is not None, "links": {"onboard": links["onboard"], "onboard_on": feed is not None, "external": links["external"]},
                 "rover": {"id": rid["id"], "state": rstate, "countdown": max(0.0, rid["go_at"] - now)},
                 "run": {"state": rs, "mode": mode, "manual": brain.manual is not None},
                 "chips": chips, "arena": arena, "follower": follower, "opps": opps, "plan": plan_d,
@@ -473,6 +501,39 @@ def main(argv=None):
                 return {"error": str(e)}
             log("WARN", f"Experiment {c.get('id')}: {v}")
             return {"ok": True, "value": v}
+        if k == "onboard_connect":                             # the rover camera: paste its stream link in the dashboard
+            url = str(c.get("url", "")).strip()
+            if not (url.isdigit() or url.lower().startswith(("http://", "https://", "rtsp://", "rtmp://", "udp://"))) or len(url) > 300:
+                return {"error": "paste the stream link, for example http://192.168.137.204:81/stream"}
+            start_onboard(url)
+            links["onboard"] = url
+            try:
+                json.dump({k2: v for k2, v in links.items() if v}, open(LINKS_FILE, "w"))
+            except OSError:
+                pass
+            log("INFO", f"Rover camera connected: {url}")
+            return {"ok": True}
+        if k == "onboard_disconnect":
+            stop_onboard()
+            log("INFO", "Rover camera disconnected")
+            return {"ok": True}
+        if k == "external_camera":                             # the external camera: a number or a link; applied inside the vision loop
+            src = _camera_arg(str(c.get("source", "")).strip())
+            if src == "" or (isinstance(src, str) and (not src.lower().startswith(("http://", "https://", "rtsp://", "rtmp://", "udp://")) or len(src) > 300)):
+                return {"error": "type the camera number (0, 1, 2 ...) or paste a stream link"}
+            import tracker as _trk_ext
+            cap_raw, frame0 = _trk_ext._open_raw(src)
+            if cap_raw is None:
+                return {"error": f"could not open camera {src}. Close other apps using it, or try `python tracker.py --scan`."}
+            h0, w0 = frame0.shape[:2]
+            shared["new_cam"] = (_trk_ext.Cam(cap_raw, True if args.flip else _trk_ext.FLIP_HORIZONTAL), (w0, h0))
+            links["external"] = str(src)
+            try:
+                json.dump({k2: v for k2, v in links.items() if v}, open(LINKS_FILE, "w"))
+            except OSError:
+                pass
+            log("INFO", f"External camera switched to {src}")
+            return {"ok": True}
         if k == "settings_list":
             return {"ok": True, "settings": settings.listing(), "saved_file": os.path.exists(settings.SETTINGS_FILE)}
         if k == "setting":
@@ -605,7 +666,7 @@ def main(argv=None):
             brain.run(stop, lambda: yaw_to_leader)
 
     threads = [threading.Thread(target=brain_when_ready, daemon=True)]
-    if receiver or ext or feed:
+    if True:
         def watchdog():
             warned = {}
             time.sleep(5)

@@ -296,6 +296,9 @@ fail-safe switch, manual drive, and **START / PAUSE / STOP** plus the **Rover ID
 - STOP stops the wheels and needs START again. Ctrl+C in the terminal, or **Quit program** (press twice), ends everything.
 - It listens on this computer only, and every command needs a random token that is inside the page, so another web page cannot press START for you.
 - The old window with its keys is still there: `python follow.py --camera 1 --window` (R + number + Enter = rover ID, P = pause).
+- **Cameras are set in the dashboard**: paste the rover's stream link (for example `http://192.168.137.204:81/stream`) into *Rover camera link* and press **Connect** (no `--onboard` flag needed);
+  type a camera number or paste a link into *External camera* and press **Switch** (it looks for the floor marker again). Both boxes remember the last value in `links.json`.
+  Only http, https, rtsp, rtmp, udp links and camera numbers are accepted.
 - Needs `--camera N` (the external camera). `--onboard` on its own keeps the old window.
 - **Experiments panel** (bottom of the page): every experimental option as a switch, with what the simulator measured for it. Changes apply on the next step,
   are written to the event log, and **Reset all to defaults** undoes them. (`experiments.py` is the list.)

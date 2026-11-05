@@ -734,15 +734,21 @@ def main(camera=None, flip=None, on_yaw=None, on_state=None, on_draw=None, on_ke
                         cv2.waitKey(1)
             return ok, fr
 
-    pcap, tries = _Preview(cap), 0
-    while not tr.lock_floor(pcap, timeout=5.0):
-        tries += 1
-        print(f"Still looking for the floor marker (ID {FLOOR_ID}) ... is it flat, in view and well lit? (attempt {tries})")
-        if (should_stop is not None and should_stop()) or (not headless and cv2.waitKey(1) & 0xFF == 27):
-            cap.release()
-            if not headless:
-                cv2.destroyAllWindows()
-            return
+    def lock():
+        """Look for the floor marker (with the live picture and a message) until it is found. False = told to stop."""
+        tries = 0
+        while not tr.lock_floor(_Preview(cap), timeout=5.0):
+            tries += 1
+            print(f"Still looking for the floor marker (ID {FLOOR_ID}) ... is it flat, in view and well lit? (attempt {tries})")
+            if (should_stop is not None and should_stop()) or (not headless and cv2.waitKey(1) & 0xFF == 27):
+                return False
+        return True
+
+    if not lock():
+        cap.release()
+        if not headless:
+            cv2.destroyAllWindows()
+        return
     print("Floor found (re-solved every frame, so the camera may move: keep the floor marker in view).  1/2/3 pick opponent slot, then click its balloon to set the colour | M mask | F re-lock | [ ] FOV | Esc quit")
 
     latest = {"frame": None}
@@ -764,9 +770,26 @@ def main(camera=None, flip=None, on_yaw=None, on_state=None, on_draw=None, on_ke
             break
         if on_tick is not None:
             try:
-                on_tick(tr, cap)
+                new = on_tick(tr, cap)
             except Exception as e:
+                new = None
                 print("on_tick error:", repr(e))
+            if new is not None:                                      # the dashboard switched the external camera
+                new_cap, new_size = new
+                try:
+                    cap.release()
+                except Exception:
+                    pass
+                cap = new_cap
+                if tuple(new_size) != tuple(tr.size):
+                    tr.size = tuple(new_size)
+                    tr.K = intrinsics_from_fov(tr.size, tr.fov_deg)
+                tr.floor_from_cam = None
+                tr._floor_t = None
+                print(f"External camera switched ({new_size[0]}x{new_size[1]}): looking for the floor marker again ...")
+                if not lock():
+                    break
+                continue
         ok, frame = cap.read()
         if not ok:
             break
