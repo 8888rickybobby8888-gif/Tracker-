@@ -250,7 +250,8 @@ Folder `rover_esp32/` (copy it whole, the folder name must match the .ino name):
 5. Upload, open the Serial Monitor at 115200. It prints `Camera stream: http://192.168.x.x:81/stream`.
 6. Put the computer on the same hotspot, then: `python follow.py --camera 1 --onboard http://192.168.x.x:81/stream`.
 
-The lidar needs nothing more: `follow.py` listens on UDP port 4210. If the hotspot blocks broadcast (some phones do), set `LIDAR_DEST` in `lidar_udp.h`
+**No lidar?** The sketch is camera only by default (`USE_LIDAR 0`, no SparkFun library needed): run `follow.py` with `--no-lidar`. To add a lidar later set `USE_LIDAR 1`, install the library and wire it.
+With a lidar, nothing more is needed: `follow.py` listens on UDP port 4210. If the hotspot blocks broadcast (some phones do), set `LIDAR_DEST` in `lidar_udp.h`
 to the computer's IP. Reserve a fixed address for the board in the hotspot's settings if you can.
 
 ### Serial Monitor lines and what they mean (rover_esp32)
