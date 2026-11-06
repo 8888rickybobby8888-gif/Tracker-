@@ -12,7 +12,7 @@
     1. Boards Manager: install "esp32 by Espressif Systems".
        (File > Preferences > Additional boards manager URLs:
         https://espressif.github.io/arduino-esp32/package_esp32_index.json )
-    2. Library Manager: install "SparkFun VL53L5CX Arduino Library".
+    2. Library Manager: install "SparkFun VL53L5CX Arduino Library" (ONLY if you set USE_LIDAR to 1 below; the default 0 is camera only).
     3. ESP32-S3 WROOM-1 board (two USB-C sockets):  Tools > Board > esp32 > "ESP32S3 Dev Module"
          Tools > PSRAM: "OPI PSRAM" for an N16R8 module, "QSPI PSRAM" for N8R2 / N4R2 (the name printed on the module tells you)
          Tools > Flash Size: to match the module (N16 = 16MB, N8 = 8MB)   Tools > Partition Scheme: "Huge APP (3MB No OTA/1MB SPIFFS)"
@@ -40,6 +40,8 @@ const char* WIFI_PASS = "42636D$s";
 // #define CAMERA_MODEL_WROVER_KIT     // ESP32-WROVER-KIT style board
 // THE S3 PINS ARE THE COMMON ONES, NOT CHECKED AGAINST YOUR BOARD. If "Camera init FAILED" appears, compare them with your board's schematic.
 
+#define USE_LIDAR 0                    // 0 = camera only (no lidar, no SparkFun library needed). 1 = also read the VL53L7CX lidar and broadcast it
+
 // Lidar I2C pins: two FREE pins (not the camera's, not flash/PSRAM, not USB 19/20, not the boot pins 0/3/45/46).
 #if defined(CAMERA_MODEL_ESP32S3_EYE)
 #define LIDAR_SDA 41                   // free on most S3 boards (also JTAG pins, fine unless you debug with JTAG). Other candidates: 1, 2, 14, 47, 48
@@ -51,7 +53,9 @@ const char* WIFI_PASS = "42636D$s";
 #define LIDAR_WIRE Wire1               // the camera driver keeps one I2C port to itself
 // ========================================================================
 
+#if USE_LIDAR
 #include "lidar_udp.h"
+#endif
 
 #if defined(CAMERA_MODEL_ESP32S3_EYE)
 #define PWDN_GPIO_NUM -1
@@ -112,7 +116,7 @@ const char* WIFI_PASS = "42636D$s";
 
 static bool cameraOk = false;
 static bool softJpeg = false;                 // the sensor cannot make JPEG: take RGB565 and compress it here
-#define SKETCH_VERSION "v3 (camera JPEG fallback + WiFi scan)"
+#define SKETCH_VERSION "v4 (camera JPEG fallback + WiFi scan, lidar optional)"
 
 static bool cameraInit() {
   camera_config_t config = {};
@@ -271,13 +275,21 @@ void setup() {
   cameraOk = cameraInit();
   connectWifi();
   if (cameraOk) startServer();
+#if USE_LIDAR
   lidarBegin();                               // after WiFi is up (it uses the same network)
+#endif
   Serial.printf("Camera stream: http://%s:81/stream\n", WiFi.localIP().toString().c_str());
+#if USE_LIDAR
   Serial.printf("Lidar: UDP broadcast on port %d\n", LIDAR_UDP_PORT);
+#else
+  Serial.println("Lidar: OFF (USE_LIDAR is 0). Run follow.py with --no-lidar.");
+#endif
 }
 
 void loop() {
+#if USE_LIDAR
   lidarPoll();
+#endif
   delay(1);
   static unsigned long lastPrint = 0;
   if (millis() - lastPrint > 15000) {          // repeat the address, in case the Serial Monitor was opened late

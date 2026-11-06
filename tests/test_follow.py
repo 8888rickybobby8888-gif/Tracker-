@@ -253,6 +253,14 @@ def side():
         xs = {e["id"]: e for e in json.loads(http("/api/state")[1])["experiments"]}
         dres["exp_on"] = (xs["backoff"]["value"], follow.evade.BACKOFF_SPEED)
         http("/api/cmd", {"cmd": "experiments_reset"}, tok); time.sleep(0.2)
+        import onboard as _ob_t
+        r_bad = json.loads(http("/api/cmd", {"cmd": "onboard_connect", "url": "file:///etc/passwd"}, tok)[1]); dres["ob_bad"] = "error" in r_bad
+        r_ok = json.loads(http("/api/cmd", {"cmd": "onboard_connect", "url": "http://192.168.137.204:81/stream"}, tok)[1]); time.sleep(0.6)
+        stt = json.loads(http("/api/state")[1]); dres["ob_on"] = (r_ok.get("ok"), stt["links"]["onboard_on"], stt["links"]["onboard"], stt["chips"]["onboard"] is not None)
+        code, jpg2 = http("/frame.jpg?cam=onboard"); dres["ob_jpg"] = (code, jpg2[:2] == b"\xff\xd8")
+        http("/api/cmd", {"cmd": "onboard_disconnect"}, tok); time.sleep(0.2)
+        dres["ob_off"] = json.loads(http("/api/state")[1])["links"]["onboard_on"]
+        dres["ex_bad"] = "error" in json.loads(http("/api/cmd", {"cmd": "external_camera", "source": ""}, tok)[1])
         code, pg = http("/settings"); dres["settings_page"] = (code, b"Rover settings" in pg, b"__TOKEN__" not in pg)
         lst = json.loads(http("/api/cmd", {"cmd": "settings_list"}, tok)[1]); dres["settings_n"] = len(lst.get("settings", []))
         r1 = json.loads(http("/api/cmd", {"cmd": "setting", "key": "evade.EVADE_LATENCY_S", "value": 0.6}, tok)[1]); dres["setting_set"] = (r1.get("value"), follow.evade.EVADE_LATENCY_S)
@@ -268,6 +276,15 @@ def side():
 def dres_events(): return list(LAST_EVENTS[0]) if LAST_EVENTS else []
 
 
+import onboard as _ob_mod
+class _FakeLF:
+    def __init__(self, source): self.source = source
+    def read(self):
+        import numpy as _np
+        img = _np.zeros((240, 320, 3), _np.uint8); img[:, :] = (200, 60, 30)
+        return img, time.time()
+    def release(self): pass
+_ob_mod.LatestFrame = _FakeLF
 SIDE_TASK = side
 follow.OPEN_BROWSER = False
 run_follow(["--camera", "0", "--port", str(DPORT)], secs=7.0, drive=True, window=False)
@@ -282,6 +299,9 @@ check("dashboard: speed, field of view, colour click and the camera fail-safe sw
 check("dashboard: the camera picture is a JPEG", dres.get("jpg") == (200, True), str(dres.get("jpg")))
 check("dashboard: manual drive writes the wheel speeds, STOP stops", bool(dres.get("manual_writes")) and dres.get("stopped") == "stopped", str((dres.get("manual_writes"), dres.get("stopped"))))
 check("dashboard: an experiment toggle changes the setting and Reset puts it back", dres.get("exp_on") == (True, 28) and dres.get("exp_reset") == 0, str((dres.get("exp_on"), dres.get("exp_reset"))))
+check("dashboard: pasting a rover camera link connects it (picture, chip, saved link), a non-stream link is refused, Disconnect removes it, an empty external camera is refused",
+      dres.get("ob_bad") and dres.get("ob_on") == (True, True, "http://192.168.137.204:81/stream", True) and dres.get("ob_jpg") == (200, True) and dres.get("ob_off") is False and dres.get("ex_bad"),
+      str((dres.get("ob_bad"), dres.get("ob_on"), dres.get("ob_jpg"), dres.get("ob_off"), dres.get("ex_bad"))))
 check("dashboard: the settings page is served, lists the variables, applies one, refuses a bad key, and resets", dres.get("settings_page") == (200, True, True) and dres.get("settings_n", 0) >= 50 and dres.get("setting_set") == (0.6, 0.6) and dres.get("setting_bad") and dres.get("setting_reset") == 0.4, str((dres.get("settings_page"), dres.get("settings_n"), dres.get("setting_set"), dres.get("setting_bad"), dres.get("setting_reset"))))
 check("dashboard: events reach the log", {"ROVER", "INFO"} <= (dres.get("log_tags") or set()), str(dres.get("log_tags")))
 

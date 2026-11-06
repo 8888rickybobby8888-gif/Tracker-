@@ -250,7 +250,8 @@ Folder `rover_esp32/` (copy it whole, the folder name must match the .ino name):
 5. Upload, open the Serial Monitor at 115200. It prints `Camera stream: http://192.168.x.x:81/stream`.
 6. Put the computer on the same hotspot, then: `python follow.py --camera 1 --onboard http://192.168.x.x:81/stream`.
 
-The lidar needs nothing more: `follow.py` listens on UDP port 4210. If the hotspot blocks broadcast (some phones do), set `LIDAR_DEST` in `lidar_udp.h`
+**No lidar?** The sketch is camera only by default (`USE_LIDAR 0`, no SparkFun library needed): run `follow.py` with `--no-lidar`. To add a lidar later set `USE_LIDAR 1`, install the library and wire it.
+With a lidar, nothing more is needed: `follow.py` listens on UDP port 4210. If the hotspot blocks broadcast (some phones do), set `LIDAR_DEST` in `lidar_udp.h`
 to the computer's IP. Reserve a fixed address for the board in the hotspot's settings if you can.
 
 ### Serial Monitor lines and what they mean (rover_esp32)
@@ -295,6 +296,9 @@ fail-safe switch, manual drive, and **START / PAUSE / STOP** plus the **Rover ID
 - STOP stops the wheels and needs START again. Ctrl+C in the terminal, or **Quit program** (press twice), ends everything.
 - It listens on this computer only, and every command needs a random token that is inside the page, so another web page cannot press START for you.
 - The old window with its keys is still there: `python follow.py --camera 1 --window` (R + number + Enter = rover ID, P = pause).
+- **Cameras are set in the dashboard**: paste the rover's stream link (for example `http://192.168.137.204:81/stream`) into *Rover camera link* and press **Connect** (no `--onboard` flag needed);
+  type a camera number or paste a link into *External camera* and press **Switch** (it looks for the floor marker again). Both boxes remember the last value in `links.json`.
+  Only http, https, rtsp, rtmp, udp links and camera numbers are accepted.
 - Needs `--camera N` (the external camera). `--onboard` on its own keeps the old window.
 - **Experiments panel** (bottom of the page): every experimental option as a switch, with what the simulator measured for it. Changes apply on the next step,
   are written to the event log, and **Reset all to defaults** undoes them. (`experiments.py` is the list.)
@@ -338,6 +342,12 @@ Set `MARKER_SIZE` (tracker.py or the Settings page) to the size you printed (def
 `python follow.py --markers top` uses one flat marker instead (`python make_markers.py --markers top --size 0.08`).
 Simulator check of the four-marker layout (6 cm markers, static rover, camera moved to four very different positions): heading within 1.5 degrees; the plain solve was off by up to 29.
 In the full renderer with four 5 cm faces: `chase_around` 7.5 s, `start_beside_nogo` 11.7 s, `three_calm` all popped in 18.4 s, no line crossings; the simulator's tuned `hunter` results were made with the flat marker and were not re-measured.
+
+## Choosing the external camera
+`python follow.py --camera N`: N is the camera's number. Not sure which? `python tracker.py --scan` tries cameras 0 to 9, prints the ones that open with their size and
+saves `camera_0.jpg`, `camera_1.jpg` ... so you can open the pictures and see which is which (`python tracker.py --list` previews them live instead). Close other apps that use
+the camera (the Windows Camera app, Teams, a browser tab). `--camera` also takes a URL, so a phone or IP camera works: `--camera http://192.168.1.20:8080/video`.
+The ESP32's own camera is separate: that is `--onboard http://<ip>:81/stream`.
 
 ## Tandem: external camera + the follower's own camera (untested on hardware)
 ```

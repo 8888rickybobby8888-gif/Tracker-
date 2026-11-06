@@ -99,6 +99,24 @@ input[type=number],input[type=text]{min-height:44px;width:84px;padding:0 10px;ba
     <h2>Camera</h2>
     <div class="row" style="gap:8px"><button class="btn on" id="camExt" type="button">External (arena)</button><button class="btn" id="camOn" type="button">Onboard (ESP32)</button></div>
    </div>
+   <div class="grid2" style="gap:10px">
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+     <label class="small mute" for="onUrl">Rover camera link (paste the ESP32 stream)</label>
+     <div class="row" style="gap:8px;flex-wrap:nowrap">
+      <input id="onUrl" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://192.168.137.204:81/stream" style="flex:1 1 auto;min-width:0;width:auto">
+      <button class="btn" id="onGo" type="button">Connect</button>
+      <button class="btn" id="onOff" type="button" hidden>Disconnect</button>
+     </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+     <label class="small mute" for="exSrc">External camera (a number, or paste a link)</label>
+     <div class="row" style="gap:8px;flex-wrap:nowrap">
+      <input id="exSrc" type="text" autocomplete="off" spellcheck="false" placeholder="1  or  http://192.168.1.20:8080/video" style="flex:1 1 auto;min-width:0;width:auto">
+      <button class="btn" id="exGo" type="button">Switch</button>
+     </div>
+    </div>
+   </div>
+   <span class="small mute" id="camMsg" aria-live="polite"></span>
    <div class="video" id="video">
     <img id="frame" alt="Live camera picture" hidden>
     <div class="empty" id="noframe">Waiting for the first camera picture...</div>
@@ -257,7 +275,7 @@ function nextFrame() {
   t.onload = () => { img.src = t.src; img.hidden = false; $("noframe").hidden = true; setTimeout(nextFrame, 60); };
   t.onerror = () => { setTimeout(nextFrame, 400); };
   fetch("/frame.jpg?cam=" + camSel + "&t=" + Date.now()).then((r) => (r.status === 200 ? r.blob() : null)).then((b) => {
-    if (!b) { img.hidden = true; $("noframe").hidden = false; $("noframe").textContent = camSel === "onboard" ? "No onboard picture. Start follow.py with --onboard to use the rover's own camera." : "Waiting for the first camera picture..."; setTimeout(nextFrame, 400); return; }
+    if (!b) { img.hidden = true; $("noframe").hidden = false; $("noframe").textContent = camSel === "onboard" ? "No rover camera yet: paste its stream link in the box above and press Connect." : "Waiting for the first camera picture..."; setTimeout(nextFrame, 400); return; }
     t.src = URL.createObjectURL(b);
   }).catch(() => setTimeout(nextFrame, 600));
 }
@@ -311,6 +329,7 @@ function render(s) {
   $("camInfo").textContent = camSel === "external" ? "External camera" + (c.external.alive ? " · " + f1(c.external.fps) + " fps" : "") + " · FOV " + f1(s.settings.fov) + "°" : "Onboard camera" + (c.onboard && c.onboard.alive ? " · " + f1(c.onboard.fps) + " fps" : "");
 
   { const nx = (s.experiments || []).filter((e) => e.value !== e.default).length; $("setInfo").textContent = nx ? nx + " experiment(s) are switched away from their defaults. Open the settings page to see or reset them." : "Every variable (marker sizes, margins, thresholds, timings, speeds) and every experimental switch, adjustable here and saved to settings.json."; }
+  syncLinks(s);
   renderMap(s);
   renderInfo(s);
   renderLidar(s);
@@ -321,6 +340,24 @@ function render(s) {
   if (document.activeElement !== $("speed")) { $("speed").value = s.settings.speed; $("speedV").textContent = Math.round(s.settings.speed) + " cm/s"; }
   if (document.activeElement !== $("fov")) { $("fov").value = s.settings.fov; $("fovV").textContent = Math.round(s.settings.fov) + "°"; }
   $("camstop").checked = s.settings.camstop;
+}
+
+
+/* ---------- camera links ---------- */
+function camMsg(t) { $("camMsg").textContent = t; }
+$("onGo").onclick = () => { camMsg("Connecting to the rover camera ..."); post({cmd: "onboard_connect", url: $("onUrl").value.trim()}).then((r) => { camMsg(r.error ? r.error : "Rover camera link set. Press the Onboard (ESP32) button above the picture to look at it."); }); };
+$("onOff").onclick = () => post({cmd: "onboard_disconnect"}).then(() => camMsg("Rover camera disconnected."));
+$("onUrl").addEventListener("keydown", (e) => { if (e.key === "Enter") $("onGo").click(); });
+$("exGo").onclick = () => { camMsg("Switching the external camera (it will look for the floor marker again) ..."); post({cmd: "external_camera", source: $("exSrc").value.trim()}).then((r) => { camMsg(r.error ? r.error : "External camera switched."); }); };
+$("exSrc").addEventListener("keydown", (e) => { if (e.key === "Enter") $("exGo").click(); });
+function syncLinks(s) {
+  const L = s.links || {};
+  if (document.activeElement !== $("onUrl") && !$("onUrl").dataset.t) $("onUrl").value = L.onboard || "";
+  if (document.activeElement !== $("exSrc") && !$("exSrc").dataset.t) $("exSrc").value = L.external || "";
+  $("onUrl").oninput = () => { $("onUrl").dataset.t = "1"; };
+  $("exSrc").oninput = () => { $("exSrc").dataset.t = "1"; };
+  $("onOff").hidden = !L.onboard_on;
+  $("onGo").textContent = L.onboard_on ? "Reconnect" : "Connect";
 }
 
 /* ---------- map ---------- */
