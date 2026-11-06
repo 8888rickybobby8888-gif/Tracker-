@@ -18,7 +18,7 @@ or lidar.**
 | Part | Role | Status |
 |---|---|---|
 | External camera (the computer's back camera, may move) | positions of the follower and every opponent; follower heading from a marker | built (`tracker.py`) |
-| Follower markers: FOUR ArUco (DICT_4X4_50, IDs 0-3, front/left/back/right faces of a post, leaning back 20 deg); `--markers top` = one flat marker | follower position + yaw | built, simulator-tested (the simulator's tuned scenarios still use the flat marker) |
+| Follower markers (default "tower"): ID 0 FLAT on top of a tower + IDs 1-4 on the faces (front/left/back/right, leaning back 20 deg), DICT_4X4_50; `--markers post` = faces IDs 0-3 only; `--markers top` = one flat marker | follower position + yaw | built, simulator-tested (the simulator's tuned scenarios still use the flat marker) |
 | Floor marker ID 8 (15 cm), taped flat | defines the origin, re-solved every frame | built |
 | ESP32 WROVER camera board + rear lidar (VL53L7CX 4x4, 60 deg, 3.5 m) | rear chaser detection over WiFi UDP | code written, never compiled on real hardware |
 | Micromelon IR (sides), ultrasonic (front), **3 floor colour sensors**, encoders | IR picks a turn side; colour sensors now an opt-in tape detector (`--floor-sensors`); the rest unused | IR used; colour sensors untested on hardware |

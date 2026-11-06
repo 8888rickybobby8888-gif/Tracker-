@@ -847,6 +847,31 @@ pl.NOGO_MARGIN_M = 0.13
 
 check("tracker.camera_arg: a number is a camera index, anything else is a URL / path", _tkc.camera_arg("2") == 2 and _tkc.camera_arg("http://192.168.1.5:8080/video") == "http://192.168.1.5:8080/video", "")
 
+
+# ---- the TOWER layout: flat ID 0 on top + faces 1-4
+_tkc.set_layout("tower")
+_tkc.TOP_MARKER_OFFSET, _old_tmh, _old_mh = (0.0, 0.0), _tkc.TOP_MARKER_HEIGHT, _tkc.MARKER_HEIGHT
+_tkc.MARKER_HEIGHT, _tkc.TOP_MARKER_HEIGHT = 0.09, 0.13
+_rend_t = _swo.Renderer(seed=1)
+_tw = []
+for pos, tgt in (([0.80, -0.95, 1.75], [0.80, 0.0, 0.0]), ([2.0, 0.0, 1.7], [0.80, 0.0, 0.0]), ([0.80, 1.0, 1.7], [0.80, 0.0, 0.0]), ([0.80, -1.5, 0.9], [0.80, 0.0, 0.0])):
+    cam = _swo.Cam(_tkc.intrinsics_from_fov(_swo.SIZE, 70.0), _look(pos, tgt))
+    _trt = _tkc.Tracker(size=_swo.SIZE, fov_deg=70.0)
+    _tkc.MARKER_SIZE = 0.05
+    class _Ct:
+        def read(self_): return True, _rend_t.render(_snap_p, cam)
+    _trt.lock_floor(_Ct(), n=8)
+    ye, ids = [], set()
+    for i in range(12):
+        st = _trt.update(_rend_t.render(_snap_p, cam)); ids |= set(_trt.last_det)
+        if i >= 4 and st.get("follower"): ye.append(abs(((st["follower"]["yaw"] - 20.0 + 180) % 360) - 180))
+    _tw.append((float(np.mean(ye)) if ye else 999.0, ids))
+check("tower layout (flat ID 0 on top + faces 1-4, 5 cm markers): heading within 5 deg from four very different camera positions", max(e for e, _ in _tw) < 5.0, str([round(e, 1) for e, _ in _tw]))
+check("tower layout: the top marker (ID 0) and the faces (IDs 1-4) are both used", any(0 in i for _, i in _tw) and any(i & {1, 2, 3, 4} for _, i in _tw), str([sorted(i) for _, i in _tw]))
+check("tower layout: IDs are 0 flat, 1 front, 2 left, 3 back, 4 right", [(k, v[1]) for k, v in sorted(_tkc.FACES.items())] == [(0, None), (1, 0), (2, 90), (3, 180), (4, 270)], str(_tkc.FACES))
+_tkc.MARKER_HEIGHT, _tkc.TOP_MARKER_HEIGHT, _tkc.MARKER_SIZE = _old_mh, _old_tmh, 0.08
+_tkc.set_layout("top")
+
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]
 for r_ in failed:

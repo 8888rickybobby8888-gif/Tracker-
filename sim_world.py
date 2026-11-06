@@ -42,6 +42,7 @@ BALLOON_BACK = 0.10              # rover centre -> balloon, backwards (a stick o
 BALLOON_Z, BALLOON_R = 0.15, 0.045
 tk.set_layout("top")                                # the simulator's tuned results use the single flat marker (set_layout("post") draws four faces instead)
 tk.MARKER_SIZE = 0.08                              # the simulator's tuned scenarios use an 8 cm flat marker
+tk.TOP_MARKER_HEIGHT = 0.08
 tk.TOP_MARKER_OFFSET = (0.02, 0.0)   # the follower's marker sits slightly forward of centre, away from its own balloon
 BODY_CIRCLE = 0.07               # used for lidar returns and collisions
 NOGO_VIOLATION_M = BODY_CIRCLE   # a violation is counted when the follower's centre is closer than this to the no-go zone ...
@@ -338,7 +339,7 @@ class Renderer:
         self.pool = [np.rint(self.rng.normal(0, noise, (SIZE[1], SIZE[0], 3))).astype(np.int16) for _ in range(5)] if noise > 0 else []
         d = cv2.aruco.getPredefinedDictionary(tk.DICTIONARY)
         self.markers = {i: cv2.cvtColor(cv2.aruco.generateImageMarker(d, i, 120), cv2.COLOR_GRAY2BGR)
-                        for i in sorted({tk.FLOOR_ID, tk.TOP_MARKER_ID, 0, 1, 2, 3})}
+                        for i in sorted({tk.FLOOR_ID, tk.TOP_MARKER_ID, 0, 1, 2, 3, 4})}
 
     def _marker(self, img, marker_id, corners3d, cam):
         c3 = np.asarray(corners3d, float)

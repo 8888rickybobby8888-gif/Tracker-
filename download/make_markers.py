@@ -84,7 +84,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Print-ready ArUco markers at true size")
     ap.add_argument("--size", type=float, default=None, metavar="METRES", help="black-square size of each FOLLOWER marker, e.g. 0.05 for 5 cm (default: MARKER_SIZE in tracker.py)")
     ap.add_argument("--floor-size", type=float, default=None, metavar="METRES", help="size of the floor marker (default: FLOOR_SIZE in tracker.py)")
-    ap.add_argument("--markers", choices=["post", "top"], default=None, help="post = four follower markers (IDs 0-3, default), top = one flat marker")
+    ap.add_argument("--markers", choices=["tower", "post", "top"], default=None, help="tower = flat ID 0 on top + faces IDs 1-4 (default), post = faces IDs 0-3, top = one flat marker")
     a = ap.parse_args()
     tk.set_layout(a.markers or tk.MARKER_LAYOUT)
     if a.size:

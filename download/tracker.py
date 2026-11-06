@@ -51,14 +51,15 @@ MARKER_SIZE = 0.05                # side length of EACH follower marker, metres 
 #   "top":  ONE marker lying flat on top of the follower, its top edge pointing to the rover's FRONT. Best when the
 #           external camera looks down from above (it works at an angle too, but yaw gets noisier).
 #   "post": four markers on the faces of a post (make_markers.py prints them), for a low side-on camera.
-MARKER_LAYOUT = "post"            # "post" = FOUR markers on the faces of a post (default); "top" = one flat marker. follow.py --markers top|post
+MARKER_LAYOUT = "tower"           # "tower" = flat ID 0 on top of a post + four side faces (default); "post" = four faces only; "top" = one flat marker. follow.py --markers
 TOP_MARKER_ID = 0
 TOP_MARKER_OFFSET = (0.0, 0.0)    # "top": marker centre from the rover's centre: (forward, left), metres (MEASURE)
 RED_GUARD = True                  # a RED balloon looks like the red tape: for red-like slots, ignore the tape band (needs arena.json) and long thin blobs
 TAPE_BAND_M = (-0.02, 0.08)       # where the tape lies relative to the arena edge, metres (inside, outside); the arena corners are the INNER edge of the tape
 LOCK_PREVIEW = True               # show the live picture (with a message) while the floor marker is being looked for
 PLANE_MARKER = True               # a marker that lies flat on the rover gets its heading from the floor plane, not from solvePnP (no 30-60 degree flips at oblique camera angles)
-MARKER_HEIGHT = 0.08              # floor -> marker centre, metres (MEASURE; "top": the rover's top surface)
+MARKER_HEIGHT = 0.08              # floor -> centre of the SIDE-FACE markers, metres (MEASURE)
+TOP_MARKER_HEIGHT = 0.08          # floor -> centre of the FLAT top marker, metres (MEASURE: for the "tower" layout this is the very top of the tower, higher than MARKER_HEIGHT)
 POST_RADIUS = 0.04                # "post" only: robot centre -> face of a marker, metres
 TILT_DEG = 20.0                   # "post" only: backwards lean of each face (0 = vertical)
 
@@ -68,15 +69,19 @@ FACES = {}
 
 
 def set_layout(layout):
-    """Choose the follower marker layout: "post" (four markers, IDs 0-3, on the faces of a post) or "top" (one flat marker, ID TOP_MARKER_ID).
-    Call it BEFORE a Tracker is made."""
+    """Choose the follower marker layout. Call it BEFORE a Tracker is made.
+      "post":  four markers on the faces of a post, IDs 0 front, 1 left, 2 back, 3 right.
+      "tower": the same four faces as IDs 1 front, 2 left, 3 back, 4 right, and ID 0 FLAT on top of the tower (its top edge to the rover's front).
+      "top":   one flat marker, ID TOP_MARKER_ID."""
     global MARKER_LAYOUT
-    if layout not in ("post", "top"):
-        raise ValueError('layout must be "post" or "top"')
+    if layout not in ("post", "top", "tower"):
+        raise ValueError('layout must be "post", "tower" or "top"')
     MARKER_LAYOUT = layout
     FACES.clear()
     if layout == "top":
         FACES[TOP_MARKER_ID] = ("follower", None)
+    elif layout == "tower":
+        FACES.update({TOP_MARKER_ID: ("follower", None), 1: ("follower", 0), 2: ("follower", 90), 3: ("follower", 180), 4: ("follower", 270)})
     else:
         FACES.update({0: ("follower", 0), 1: ("follower", 90), 2: ("follower", 180), 3: ("follower", 270)})
 
@@ -155,7 +160,7 @@ def robot_from_marker(angle_deg):
     if angle_deg is None:                      # flat on top: marker "up" edge = rover forward, face normal = up
         M = np.eye(4)
         M[:3, 0], M[:3, 1], M[:3, 2] = [0, -1, 0], [1, 0, 0], [0, 0, 1]
-        M[:3, 3] = [TOP_MARKER_OFFSET[0], TOP_MARKER_OFFSET[1], MARKER_HEIGHT]
+        M[:3, 3] = [TOP_MARKER_OFFSET[0], TOP_MARKER_OFFSET[1], TOP_MARKER_HEIGHT]
         return M
     a, t = math.radians(angle_deg), math.radians(TILT_DEG)
     n = np.array([math.cos(a) * math.cos(t), math.sin(a) * math.cos(t), math.sin(t)])  # face normal
@@ -298,11 +303,11 @@ class Tracker:
 
 
     def _plane_pose(self, corners):
-        """Floor <- marker for a marker that lies FLAT (horizontal, at MARKER_HEIGHT): cast each corner's camera ray onto that plane and take
+        """Floor <- marker for a marker that lies FLAT (horizontal, at TOP_MARKER_HEIGHT): cast each corner's camera ray onto that plane and take
         the position and heading straight from the four floor points. The usual single-marker solve (solvePnP) can flip between two
         look-alike answers when the marker is small or seen at a slant, which turned the heading by 30-60 degrees whenever the camera was
         moved to a low side angle; this cannot, because the marker's tilt is known instead of guessed."""
-        pts = [self._pixel_to_floor(tuple(c), MARKER_HEIGHT) for c in corners]
+        pts = [self._pixel_to_floor(tuple(c), TOP_MARKER_HEIGHT) for c in corners]
         if any(p is None for p in pts):
             return None
         p = np.array(pts, float)
@@ -315,7 +320,7 @@ class Tracker:
         c0 = p.mean(axis=0)
         T = np.eye(4)
         T[:3, :3] = np.array([[c, -sn, 0.0], [sn, c, 0.0], [0.0, 0.0, 1.0]])
-        T[:3, 3] = [c0[0], c0[1], MARKER_HEIGHT]
+        T[:3, 3] = [c0[0], c0[1], TOP_MARKER_HEIGHT]
         return T
 
     def _pose_upright(self, corners, size, M_inv):
