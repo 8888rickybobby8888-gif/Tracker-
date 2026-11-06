@@ -31,8 +31,8 @@
 #include "img_converters.h"               // frame2jpg: software JPEG for sensors that cannot produce JPEG themselves
 
 // ============================== EDIT THESE ==============================
-const char* WIFI_SSID = "YourHotspot";
-const char* WIFI_PASS = "YourPassword";
+const char* WIFI_SSID = "LOGANS_SURFACE 7169";
+const char* WIFI_PASS = "42636D$s";
 
 // Pick ONE camera model (the pins of the camera socket on your board):
 #define CAMERA_MODEL_ESP32S3_EYE       // ESP32-S3 WROOM-1 camera boards (Espressif ESP32-S3-EYE, Freenove ESP32-S3 WROOM CAM and most look-alikes with a DVP camera socket)
