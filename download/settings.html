@@ -47,6 +47,7 @@ summary .n{font-weight:400;color:var(--mute);font-size:12px;font-family:var(--mo
 .exp select{min-height:40px;background:var(--panel);color:var(--ink);border:1px solid var(--btn2line);border-radius:8px;padding:0 10px;font-family:var(--mono)}
 .note{font-size:12px;color:var(--mute);line-height:1.5;margin:0}
 @media (max-width:700px){.row{grid-template-columns:minmax(0,1fr)}}
+.toast{position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:50;max-width:min(92vw,640px);padding:12px 16px;background:#c8323a;color:#fff;border-radius:10px;font-size:14px;box-shadow:0 6px 24px rgba(0,0,0,.5)}
 </style>
 </head>
 <body>
@@ -65,11 +66,24 @@ summary .n{font-weight:400;color:var(--mute);font-size:12px;font-family:var(--mo
 <script>
 "use strict";
 const TOKEN = "__TOKEN__";
+if (TOKEN === "__" + "TOKEN__" || location.protocol === "file:") { document.addEventListener("DOMContentLoaded", () => { const b = document.createElement("div"); b.style.cssText = "position:sticky;top:0;z-index:60;padding:14px 16px;background:#c8323a;color:#fff;font-weight:600"; b.textContent = "This page was opened as a FILE, so it is not connected to anything. Run follow.py and open the address it prints (http://127.0.0.1:8765/)."; document.body.prepend(b); }); }
 const $ = (id) => document.getElementById(id);
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+function toast(msg, ok) {
+  let t = document.getElementById("toast");
+  if (!t) { t = document.createElement("div"); t.id = "toast"; t.className = "toast"; t.setAttribute("role", "alert"); document.body.appendChild(t); }
+  t.style.background = ok ? "#1d7f5e" : "#c8323a";
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(t._h); t._h = setTimeout(() => { t.hidden = true; }, 6000);
+}
 function post(cmd) {
   return fetch("/api/cmd", {method: "POST", headers: {"X-Token": TOKEN, "Content-Type": "application/json"}, body: JSON.stringify(cmd)})
-    .then((r) => r.json()).catch(() => ({error: "no answer from the program"}));
+    .then(async (r) => {
+      const j = await r.json().catch(() => ({error: "unreadable answer from the program"}));
+      if (r.status === 403) { toast("This page is from an OLD run of follow.py, so the program refuses its buttons. Reloading the page ...", false); setTimeout(() => location.reload(), 1200); return {error: "old page"}; }
+      if (j && j.error) toast(j.error, false);
+      return j;
+    }).catch(() => { toast("No answer from follow.py. Is it still running, and is this page opened from the address it printed (not from a saved file)?", false); return {error: "no answer"}; });
 }
 let LIST = [], EXPS = [], openGroups = {"Your rover and arena (measure these)": true};
 

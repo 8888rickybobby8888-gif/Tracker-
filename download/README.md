@@ -298,6 +298,7 @@ fail-safe switch, manual drive, and **START / PAUSE / STOP** plus the **Rover ID
 - If the browser does not open by itself, copy the address from the `DASHBOARD:` line in the terminal into a browser on the same computer (`--no-browser` skips the attempt).
 - The rover connects in the background (it counts down 8 s with the default ID, so you can change it first) and then **stands still until you press START**.
 - STOP stops the wheels and needs START again. Ctrl+C in the terminal, or **Quit program** (press twice), ends everything.
+- **Is it communicating?** Press any button and watch the *Event log*: `Slot C colour set: H=...` appears after Set colour, `START: ...` after START. A red message at the bottom of the page says when a command is refused (an old tab after restarting follow.py reloads itself); a red banner at the top means the page was opened as a file instead of from the address follow.py prints.
 - It listens on this computer only, and every command needs a random token that is inside the page, so another web page cannot press START for you.
 - The old window with its keys is still there: `python follow.py --camera 1 --window` (R + number + Enter = rover ID, P = pause).
 - **Cameras are set in the dashboard**: paste the rover's stream link (for example `http://192.168.137.204:81/stream`) into *Rover camera link* and press **Connect** (no `--onboard` flag needed);
