@@ -122,8 +122,14 @@ def intrinsics_from_fov(size, fov_deg):
     return np.array([[f, 0, w / 2.0], [0, f, h / 2.0], [0, 0, 1]], np.float64)
 
 
-def hsv_ranges_around(h, sat, val, dh=10, ds=70, dv=70):
-    """HSV range(s) around a sampled colour. Handles hue wrap-around (reds)."""
+COLOR_TOL_H = 10                  # a clicked balloon colour accepts hue +- this many (OpenCV hue 0-179) ...
+COLOR_TOL_S = 70                  # ... saturation +- this many ...
+COLOR_TOL_V = 70                  # ... and brightness +- this many. WIDEN these if a balloon is only seen in some light (yellow under indoor light often needs more)
+
+
+def hsv_ranges_around(h, sat, val, dh=None, ds=None, dv=None):
+    """HSV range(s) around a sampled colour. Handles hue wrap-around (reds). Tolerances default to COLOR_TOL_H / _S / _V."""
+    dh, ds, dv = COLOR_TOL_H if dh is None else dh, COLOR_TOL_S if ds is None else ds, COLOR_TOL_V if dv is None else dv
     lo_s, hi_s = max(50, sat - ds), min(255, sat + ds)
     lo_v, hi_v = max(40, val - dv), min(255, val + dv)
     lo_h, hi_h = h - dh, h + dh

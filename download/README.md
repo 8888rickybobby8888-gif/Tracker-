@@ -353,6 +353,13 @@ saves `camera_0.jpg`, `camera_1.jpg` ... so you can open the pictures and see wh
 the camera (the Windows Camera app, Teams, a browser tab). `--camera` also takes a URL, so a phone or IP camera works: `--camera http://192.168.1.20:8080/video`.
 The ESP32's own camera is separate: that is `--onboard http://<ip>:81/stream`.
 
+### A slot (A, B or C) is not detected
+1. In the dashboard press **Mask** next to the slot: the picture shows, in green, every pixel that matches that slot's colour (and how many). Nothing green on the balloon = the colour range is wrong for your light.
+2. Press **Set colour** for the slot and click the middle of the balloon (not its highlight or its shadow). Check the mask again.
+3. Still patchy (yellow and pale balloons often are)? Settings > Camera and tracking > **Colour tolerance** (hue, saturation, brightness): widen them, then set the colour again (the tolerance applies to the next colour you set).
+4. The default colours are blue (A), green (B), yellow (C). Red needs the arena file (the red tape is masked out); a floor, wall or rover that is close to the balloon's colour will also show green in the mask.
+5. If the mask is green on the balloon but the slot still says "Not seen", the floor marker (ID 8) is probably out of view: balloons are placed on the floor through it.
+
 ## Tandem: external camera + the follower's own camera (untested on hardware)
 ```
 python follow.py --camera 1 --onboard http://<esp32>:81/stream

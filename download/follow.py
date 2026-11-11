@@ -343,6 +343,19 @@ def main(argv=None):
 
     def frame_for(name):
         import cv2
+        import numpy as np
+        if name.startswith("mask-"):                         # what the colour detector sees for one slot: its mask in green over a dimmed picture
+            tr, raw = shared.get("tr"), shared.get("raw")
+            slot = name[-1]
+            if tr is None or raw is None or slot not in getattr(tr, "opp_hsv", {}):
+                return None
+            m = tr.opponent_mask(raw, slot)
+            view = (raw * 0.35).astype(np.uint8)
+            view[m > 0] = (60, 255, 60)
+            n = int(cv2.countNonZero(m))
+            cv2.putText(view, f"slot {slot} mask: {n} px" + ("  (nothing matches: set the colour again or widen the tolerance in Settings)" if n == 0 else ""), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (60, 255, 255), 2, cv2.LINE_AA)
+            ok, buf = cv2.imencode(".jpg", view, [cv2.IMWRITE_JPEG_QUALITY, 70])
+            return buf.tobytes() if ok else None
         if name == "onboard":
             if feed is None:
                 return None
@@ -468,6 +481,8 @@ def main(argv=None):
                     status = f"In view, {b:+.0f} deg" if abs(b) <= 100 else f"Behind you, {b:+.0f} deg"
                     if abs(b) > 100 and not behind:
                         behind = sl
+                if b is None and getattr(tr, "opp_bbox", None) is not None and sl in tr.opp_bbox:
+                    status = "Colour seen in the picture, but no position (is the floor marker in view?)"
                 if plan_d and plan_d["target"] == sl:
                     status += ". Current target"
                 slots[sl] = {"swatch": sw, "hue": hue, "status": status}

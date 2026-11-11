@@ -243,7 +243,7 @@ $("bConnect").onclick = () => post({cmd: "connect", id: parseInt($("rid").value,
 $("bQuit").onclick = () => { if ($("bQuit").dataset.sure === "1") post({cmd: "quit"}); else { $("bQuit").dataset.sure = "1"; $("bQuit").textContent = "Press again to quit"; setTimeout(() => { $("bQuit").dataset.sure = "0"; $("bQuit").textContent = "Quit program"; }, 3000); } };
 $("camExt").onclick = () => setCam("external");
 $("camOn").onclick = () => setCam("onboard");
-function setCam(c) { camSel = c; $("camExt").classList.toggle("on", c === "external"); $("camOn").classList.toggle("on", c === "onboard"); }
+function setCam(c) { camSel = c; $("camExt").classList.toggle("on", c === "external" || c.startsWith("mask-")); $("camOn").classList.toggle("on", c === "onboard"); }
 $("mAuto").onclick = () => { manualMode = false; post({cmd: "mode", mode: "auto"}); };
 $("mMan").onclick = () => { manualMode = true; post({cmd: "mode", mode: "manual"}); };
 $("speed").oninput = () => { $("speedV").textContent = $("speed").value + " cm/s"; };
@@ -439,7 +439,8 @@ function renderTiming(s) {
 }
 
 function renderSlots(s) {
-  $("slots").innerHTML = Object.entries(s.slots).map(([n, d]) => '<div class="slot"><span class="sw" style="background:' + d.swatch + '"></span><div style="flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-weight:600">Slot ' + n + ' <span class="mono mute small" style="font-weight:400">' + esc(d.hue) + '</span></span><span class="small mute">' + esc(d.status) + '</span></div><button class="btn' + (pickSlot === n ? " on" : "") + '" data-slot="' + n + '" type="button" style="font-size:13px">' + (pickSlot === n ? "Click the balloon" : "Set colour") + "</button></div>").join("");
+  $("slots").innerHTML = Object.entries(s.slots).map(([n, d]) => '<div class="slot"><span class="sw" style="background:' + d.swatch + '"></span><div style="flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-weight:600">Slot ' + n + ' <span class="mono mute small" style="font-weight:400">' + esc(d.hue) + '</span></span><span class="small mute">' + esc(d.status) + '</span></div><button class="btn' + (camSel === "mask-" + n ? " on" : "") + '" data-mask="' + n + '" type="button" style="font-size:13px" aria-label="Show what slot ' + n + ' detects">Mask</button><button class="btn' + (pickSlot === n ? " on" : "") + '" data-slot="' + n + '" type="button" style="font-size:13px">' + (pickSlot === n ? "Click the balloon" : "Set colour") + "</button></div>").join("");
+  $("slots").querySelectorAll("[data-mask]").forEach((b) => { b.onclick = () => { setCam(camSel === "mask-" + b.dataset.mask ? "external" : "mask-" + b.dataset.mask); renderSlots(S); }; });
   $("slots").querySelectorAll("button").forEach((b) => { b.onclick = () => { pickSlot = pickSlot === b.dataset.slot ? null : b.dataset.slot; $("video").classList.toggle("pick", !!pickSlot); $("pickHint").hidden = !pickSlot; if (pickSlot && camSel === "onboard") $("pickHint").textContent = "Click the balloon in the onboard picture to set its colour (this sets the colour for that camera only)."; renderSlots(S); }; });
   const pref = s.plan ? s.plan.pref : "nearest";
   $("targets").innerHTML = ["nearest", "A", "B", "C"].map((n) => '<button class="btn' + (pref === n ? " on" : "") + '" data-t="' + n + '" type="button">' + (n === "nearest" ? "Nearest" : n) + "</button>").join("");
