@@ -314,13 +314,6 @@ fail-safe switch, manual drive, and **START / PAUSE / STOP** plus the **Rover ID
 In that window: **R** then type the number then **Enter** = connect to that rover; **Enter** = connect now; after a failure **R** / **Enter** retries.
 (The digits only enter the ID after you press R, so 1/2/3 still pick the balloon slot.)
 
-## Red balloons and the red tape
-The arena tape is red, so a red balloon looks like tape to the colour detector. For a slot set to a red colour (press **Set colour**, click the balloon) the tracker
-now (1) ignores the tape band round the arena (it needs `arena.json`, the corners are the inner edge of the tape) and (2) only accepts round blobs, not strips or corners.
-In the simulator that found a red balloon within 1 to 2 cm, where without it the tape was taken for the balloon (1 m off). Limits: a red balloon right on the tape edge
-can be hidden by the band, and a red no-go mat would also look red (click the balloon so the colour range is tight, and avoid red for the no-go zone). Blue, green and yellow are still safest.
-Switch: the dashboard's Experiments panel ("Red balloon guard"). The onboard camera applies the round-blob rule to a red slot too.
-
 ## Marker requirements (ArUco, DICT_4X4_50: follower = ID 0, floor = ID 8)
 - **Size in the picture decides everything**: pixels across the black square = size x focal length / distance, with focal length = (picture width / 2) / tan(FOV / 2)
   (1280 wide at 70 degrees = 914 px). Aim for **30 px or more** across (about **40 px** for a good heading); below about 20 px it flickers or vanishes.

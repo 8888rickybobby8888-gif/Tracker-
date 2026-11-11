@@ -333,8 +333,6 @@ def main(argv=None):
         new_cam = shared.pop("new_cam", None)
         if new_cam is not None:
             return new_cam                                    # tracker.main swaps to it and looks for the floor marker again
-        if planner is not None and getattr(tr, "tape_poly", None) is None and hasattr(tr, "set_tape"):
-            tr.set_tape(planner.arena.poly)                  # lets a red balloon be told from the red tape
         v = shared.get("fov")
         if v is not None:
             shared["fov"] = None

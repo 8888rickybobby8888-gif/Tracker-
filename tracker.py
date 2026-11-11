@@ -54,8 +54,6 @@ MARKER_SIZE = 0.05                # side length of EACH follower marker, metres 
 MARKER_LAYOUT = "tower3"          # "tower3" = flat ID 0 on top + faces 1 left, 2 back, 3 right (default); "tower" = flat ID 0 + faces 1-4 incl. front; "post" = four faces only; "top" = one flat marker. follow.py --markers
 TOP_MARKER_ID = 0
 TOP_MARKER_OFFSET = (0.0, 0.0)    # "top": marker centre from the rover's centre: (forward, left), metres (MEASURE)
-RED_GUARD = True                  # a RED balloon looks like the red tape: for red-like slots, ignore the tape band (needs arena.json) and long thin blobs
-TAPE_BAND_M = (-0.02, 0.08)       # where the tape lies relative to the arena edge, metres (inside, outside); the arena corners are the INNER edge of the tape
 LOCK_PREVIEW = True               # show the live picture (with a message) while the floor marker is being looked for
 PLANE_MARKER = True               # a marker that lies flat on the rover gets its heading from the floor plane, not from solvePnP (no 30-60 degree flips at oblique camera angles)
 MARKER_HEIGHT = 0.08              # floor -> centre of the SIDE-FACE markers, metres (MEASURE)
@@ -134,23 +132,6 @@ def hsv_ranges_around(h, sat, val, dh=10, ds=70, dv=70):
     return [((lo_h, lo_s, lo_v), (hi_h, hi_s, hi_v))]
 
 
-def is_red_like(ranges):
-    """True if an HSV range set covers red (hue wraps round 0 / 179)."""
-    return any(lo[0] <= 8 or hi[0] >= 172 for lo, hi in ranges)
-
-
-def balloon_shaped(c):
-    """A balloon is a compact, roundish blob. The tape (a long thin strip, or an L at a corner) is not. c = an OpenCV contour."""
-    area = cv2.contourArea(c)
-    if area <= 0:
-        return False
-    (_, _), (w, h), _ = cv2.minAreaRect(c)
-    if min(w, h) < 1e-6 or max(w, h) / min(w, h) > 2.4:
-        return False
-    (_, _), r = cv2.minEnclosingCircle(c)
-    return area / (np.pi * r * r + 1e-6) >= 0.45
-
-
 def obj_points(s):
     h = s / 2.0
     # TL, TR, BR, BL in marker coordinates (x right, y up, z out of the face)
@@ -195,7 +176,6 @@ class Tracker:
         self._filt = {}          # robot -> [x, y, sin(yaw), cos(yaw), timestamp]
         self.last_det = {}
         self.opp_hsv = {k: list(v) for k, v in OPPONENT_HSV.items()}
-        self.tape_poly = None
         self.opp_bbox = {}
 
     def set_opponent_color(self, name, h, sat, val):
@@ -205,31 +185,6 @@ class Tracker:
         """Recompute the marker-on-rover transforms after MARKER_HEIGHT, POST_RADIUS, TILT_DEG or the layout changed (Settings page)."""
         self.M_inv = {mid: np.linalg.inv(robot_from_marker(ang)) for mid, (_, ang) in FACES.items()}
 
-    def set_tape(self, arena_poly):
-        """The arena corners (floor frame, the INNER edge of the tape). Lets a red balloon be told from the red tape."""
-        self.tape_poly = [tuple(p) for p in arena_poly] if arena_poly else None
-
-    def _tape_mask(self, shape):
-        """Image mask (255 = tape band) of the tape round the arena, from the known corners and the locked floor frame."""
-        m = np.zeros(shape, np.uint8)
-        if not self.tape_poly or self.floor_from_cam is None:
-            return m
-        cx = sum(p[0] for p in self.tape_poly) / len(self.tape_poly)
-        cy = sum(p[1] for p in self.tape_poly) / len(self.tape_poly)
-        a, b = TAPE_BAND_M
-        n = len(self.tape_poly)
-        for i in range(n):
-            p, q = np.array(self.tape_poly[i]), np.array(self.tape_poly[(i + 1) % n])
-            d = q - p
-            d = d / (np.linalg.norm(d) + 1e-9)
-            nrm = np.array([-d[1], d[0]])
-            if np.dot(nrm, p - np.array([cx, cy])) < 0:          # outward normal
-                nrm = -nrm
-            quad = [p + nrm * a, q + nrm * a, q + nrm * b, p + nrm * b]
-            img = project_floor(self, [(x[0], x[1], 0.0) for x in quad])
-            cv2.fillConvexPoly(m, np.round(img).astype(np.int32), 255)
-        return m
-
     def opponent_mask(self, frame, name):
         hsv = cv2.cvtColor(cv2.GaussianBlur(frame, (7, 7), 0), cv2.COLOR_BGR2HSV)
         mask = np.zeros(hsv.shape[:2], np.uint8)
@@ -237,27 +192,20 @@ class Tracker:
             mask |= cv2.inRange(hsv, np.array(lo, np.uint8), np.array(hi, np.uint8))
         k = np.ones((5, 5), np.uint8)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, k)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, k)
-        if RED_GUARD and self.tape_poly and is_red_like(self.opp_hsv[name]):
-            mask[self._tape_mask(mask.shape) > 0] = 0            # a red balloon must not be confused with the red tape
-        return mask
+        return cv2.morphologyEx(mask, cv2.MORPH_CLOSE, k)
 
     def _detect_blob(self, frame, name):
-        """Largest blob of this opponent's colour -> ((cx, cy), (x, y, w, h)) or None. For a RED slot the blob must also be balloon-shaped."""
+        """Largest blob of this opponent's colour -> ((cx, cy), (x, y, w, h)) or None."""
         if frame is None:
             return None
         cnts, _ = cv2.findContours(self.opponent_mask(frame, name), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if not cnts:
             return None
-        red = RED_GUARD and is_red_like(self.opp_hsv[name])
-        for c in sorted(cnts, key=cv2.contourArea, reverse=True):
-            if cv2.contourArea(c) < MIN_BLOB_AREA:
-                return None
-            if red and not balloon_shaped(c):
-                continue
-            m = cv2.moments(c)
-            return (m["m10"] / m["m00"], m["m01"] / m["m00"]), cv2.boundingRect(c)
-        return None
+        c = max(cnts, key=cv2.contourArea)
+        if cv2.contourArea(c) < MIN_BLOB_AREA:
+            return None
+        m = cv2.moments(c)
+        return (m["m10"] / m["m00"], m["m01"] / m["m00"]), cv2.boundingRect(c)
 
     def _pixel_to_floor(self, px, height):
         """Cast the camera ray through pixel px and intersect it with the horizontal plane z = height
