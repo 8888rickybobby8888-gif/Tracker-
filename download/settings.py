@@ -46,7 +46,7 @@ SETTINGS = [
     S("tracker.TOP_MARKER_HEIGHT", G_GEOM, "Top marker height", "Floor to the centre of the FLAT marker on top of the tower (ID 0).", lo=0.0, hi=0.4, step=0.005, unit="m", hook="tracker"),
     S("tracker.POST_RADIUS", G_GEOM, "Post radius", "Four-marker layout: rover centre to the face of a marker.", lo=0.0, hi=0.12, step=0.005, unit="m", hook="tracker"),
     S("tracker.TILT_DEG", G_GEOM, "Marker tilt", "Four-marker layout: how far each face leans back (0 = vertical).", lo=0.0, hi=45.0, step=1.0, unit="deg", hook="tracker"),
-    S("tracker.MARKER_LAYOUT", G_GEOM, "Marker layout", "tower3 = flat ID 0 on top + IDs 1 left, 2 back, 3 right; tower = flat ID 0 + faces 1-4 (with front); post = faces 0-3; top = one flat marker.", kind="choice", choices=("tower3", "tower", "post", "top"), restart=True),
+    S("tracker.MARKER_LAYOUT", G_GEOM, "Marker layout", "tower = flat ID 0 on top + four faces IDs 1-4, post = four faces IDs 0-3, top = one flat marker.", kind="choice", choices=("tower", "post", "top"), restart=True),
     S("tracker.LEADER_HEIGHT", G_GEOM, "Balloon height", "Floor to the centre of an opponent's balloon (same for all).", lo=0.03, hi=0.45, step=0.005, unit="m"),
     S("plan.ROBOT_RADIUS_M", G_GEOM, "Rover radius", "Half the rover's longest dimension, from its centre (err on the big side).", lo=0.03, hi=0.25, step=0.005, unit="m", hook="planner"),
     S("pipeline.CONTACT_CENTRE_M", G_GEOM, "Centre to centre in contact", "Distance between two rover centres when they touch.", lo=0.05, hi=0.3, step=0.005, unit="m"),

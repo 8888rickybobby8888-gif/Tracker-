@@ -872,30 +872,6 @@ check("tower layout: IDs are 0 flat, 1 front, 2 left, 3 back, 4 right", [(k, v[1
 _tkc.MARKER_HEIGHT, _tkc.TOP_MARKER_HEIGHT, _tkc.MARKER_SIZE = _old_mh, _old_tmh, 0.08
 _tkc.set_layout("top")
 
-
-# ---- the TOWER3 layout (default): flat ID 0 on top + IDs 1 left, 2 back, 3 right (no front face)
-_tkc.set_layout("tower3")
-_ids3 = [(k, v[1]) for k, v in sorted(_tkc.FACES.items())]
-_tkc.TOP_MARKER_OFFSET, _old_tmh3, _old_mh3 = (0.0, 0.0), _tkc.TOP_MARKER_HEIGHT, _tkc.MARKER_HEIGHT
-_tkc.MARKER_HEIGHT, _tkc.TOP_MARKER_HEIGHT, _tkc.MARKER_SIZE = 0.09, 0.13, 0.05
-_rend_3 = _swo.Renderer(seed=1)
-_t3 = []
-for pos, tgt in (([0.80, -0.95, 1.75], [0.80, 0.0, 0.0]), ([2.0, 0.0, 1.7], [0.80, 0.0, 0.0]), ([0.80, 1.0, 1.7], [0.80, 0.0, 0.0]), ([0.80, -1.5, 0.9], [0.80, 0.0, 0.0])):
-    cam = _swo.Cam(_tkc.intrinsics_from_fov(_swo.SIZE, 70.0), _look(pos, tgt))
-    _tr3 = _tkc.Tracker(size=_swo.SIZE, fov_deg=70.0)
-    class _C3:
-        def read(self_): return True, _rend_3.render(_snap_p, cam)
-    _tr3.lock_floor(_C3(), n=8)
-    ye = []
-    for i in range(12):
-        st = _tr3.update(_rend_3.render(_snap_p, cam))
-        if i >= 4 and st.get("follower"): ye.append(abs(((st["follower"]["yaw"] - 20.0 + 180) % 360) - 180))
-    _t3.append(float(np.mean(ye)) if ye else 999.0)
-_tkc.MARKER_HEIGHT, _tkc.TOP_MARKER_HEIGHT, _tkc.MARKER_SIZE = _old_mh3, _old_tmh3, 0.08
-_tkc.set_layout("top")
-check("tower3 layout: IDs are 0 flat on top, 1 left, 2 back, 3 right (no front face)", _ids3 == [(0, None), (1, 90), (2, 180), (3, 270)], str(_ids3))
-check("tower3 layout (5 cm markers): heading within 5 deg from four very different camera positions", max(_t3) < 5.0, str([round(e, 1) for e in _t3]))
-
 print("\nSUMMARY: %d/%d passed" % (sum(1 for r_ in results if r_[1]), len(results)))
 failed = [r_ for r_ in results if not r_[1]]
 for r_ in failed:

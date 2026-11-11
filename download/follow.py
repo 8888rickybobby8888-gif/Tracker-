@@ -117,7 +117,7 @@ def main(argv=None):
                     help="use the floor colour sensors as a tape detector (tape guard + position fix). NOT TESTED ON THE REAL ROVER: "
                          "start with the rover on bare floor inside the arena, it learns what the floor reads")
     ap.add_argument("--no-plan", action="store_true", help="don't plan routes: yaw points straight at the nearest opponent")
-    ap.add_argument("--markers", choices=["tower3", "tower", "post", "top"], default=None, help="follower marker layout: tower3 = flat ID 0 on top + IDs 1 left, 2 back, 3 right (default), tower = flat ID 0 + faces IDs 1-4 (with a front face), post = four faces IDs 0-3, top = one flat marker")
+    ap.add_argument("--markers", choices=["tower", "post", "top"], default=None, help="follower marker layout: tower = flat ID 0 on top + four faces IDs 1-4 (default), post = four faces IDs 0-3, top = one flat marker")
     ap.add_argument("--window", action="store_true", help="use the plain OpenCV window (keys) instead of the browser dashboard")
     ap.add_argument("--no-browser", action="store_true", help="do not open the dashboard in the browser (open the printed address yourself)")
     ap.add_argument("--port", type=int, default=8765, help="dashboard port (default 8765; the next free one is used if it is busy)")
@@ -130,7 +130,7 @@ def main(argv=None):
     import tracker as _trk_layout
     if hasattr(_trk_layout, "set_layout"):
         _trk_layout.set_layout(args.markers or _trk_layout.MARKER_LAYOUT)
-        print(f"Follower markers: {_trk_layout.MARKER_LAYOUT} ({'flat ID 0 on top + faces IDs 1 left, 2 back, 3 right' if _trk_layout.MARKER_LAYOUT == 'tower3' else 'flat ID 0 on top + four faces IDs 1-4' if _trk_layout.MARKER_LAYOUT == 'tower' else 'four markers on a post, IDs 0-3' if _trk_layout.MARKER_LAYOUT == 'post' else 'one flat marker, ID 0'}), {_trk_layout.MARKER_SIZE * 100:.1f} cm each")
+        print(f"Follower markers: {_trk_layout.MARKER_LAYOUT} ({'flat ID 0 on top + four faces IDs 1-4' if _trk_layout.MARKER_LAYOUT == 'tower' else 'four markers on a post, IDs 0-3' if _trk_layout.MARKER_LAYOUT == 'post' else 'one flat marker, ID 0'}), {_trk_layout.MARKER_SIZE * 100:.1f} cm each")
     if args.max_speed is not None:
         evade.set_max_speed(args.max_speed)
     print(f"Max wheel speed: {evade.MAX_SPEED_CM_S:.0f} cm/s (applies to every motor command)")
