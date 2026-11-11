@@ -51,7 +51,7 @@ MARKER_SIZE = 0.05                # side length of EACH follower marker, metres 
 #   "top":  ONE marker lying flat on top of the follower, its top edge pointing to the rover's FRONT. Best when the
 #           external camera looks down from above (it works at an angle too, but yaw gets noisier).
 #   "post": four markers on the faces of a post (make_markers.py prints them), for a low side-on camera.
-MARKER_LAYOUT = "tower"           # "tower" = flat ID 0 on top of a post + four side faces (default); "post" = four faces only; "top" = one flat marker. follow.py --markers
+MARKER_LAYOUT = "tower3"          # "tower3" = flat ID 0 on top + faces 1 left, 2 back, 3 right (default); "tower" = flat ID 0 + faces 1-4 incl. front; "post" = four faces only; "top" = one flat marker. follow.py --markers
 TOP_MARKER_ID = 0
 TOP_MARKER_OFFSET = (0.0, 0.0)    # "top": marker centre from the rover's centre: (forward, left), metres (MEASURE)
 RED_GUARD = True                  # a RED balloon looks like the red tape: for red-like slots, ignore the tape band (needs arena.json) and long thin blobs
@@ -71,15 +71,18 @@ FACES = {}
 def set_layout(layout):
     """Choose the follower marker layout. Call it BEFORE a Tracker is made.
       "post":  four markers on the faces of a post, IDs 0 front, 1 left, 2 back, 3 right.
-      "tower": the same four faces as IDs 1 front, 2 left, 3 back, 4 right, and ID 0 FLAT on top of the tower (its top edge to the rover's front).
+      "tower3": ID 0 FLAT on top of the tower (its top edge to the rover's front) + IDs 1 left, 2 back, 3 right. No front face (the pin side). Needs markers 0-3 only.
+      "tower": the same four faces as IDs 1 front, 2 left, 3 back, 4 right, and ID 0 FLAT on top of the tower.
       "top":   one flat marker, ID TOP_MARKER_ID."""
     global MARKER_LAYOUT
-    if layout not in ("post", "top", "tower"):
-        raise ValueError('layout must be "post", "tower" or "top"')
+    if layout not in ("post", "top", "tower", "tower3"):
+        raise ValueError('layout must be "tower3", "tower", "post" or "top"')
     MARKER_LAYOUT = layout
     FACES.clear()
     if layout == "top":
         FACES[TOP_MARKER_ID] = ("follower", None)
+    elif layout == "tower3":
+        FACES.update({TOP_MARKER_ID: ("follower", None), 1: ("follower", 90), 2: ("follower", 180), 3: ("follower", 270)})
     elif layout == "tower":
         FACES.update({TOP_MARKER_ID: ("follower", None), 1: ("follower", 0), 2: ("follower", 90), 3: ("follower", 180), 4: ("follower", 270)})
     else:

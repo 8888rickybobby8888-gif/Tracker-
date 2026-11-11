@@ -1,7 +1,7 @@
 WHAT IS IN THIS FOLDER
   *.py                 run on the COMPUTER (Python 3). Install once:  pip install -r requirements.txt
   my_chase.py          YOUR chase code (edit this one)
-  markers/             THE TOWER: marker_0 = FLAT on top of the tower (top edge to the rover's front), marker_1 front, 2 left, 3 back, 4 right face; marker_8 = flat on the floor; markers_sheet.pdf has all six
+  markers/             THE TOWER: marker_0 = FLAT on top of the tower (top edge to the rover's front), marker_1 = LEFT face, 2 = BACK, 3 = RIGHT (no front face); marker_8 = flat on the floor; markers_sheet.pdf has all five
                        (python make_markers.py --size 0.05 to print them at 5 cm; set MARKER_SIZE to match in tracker.py or on the Settings page)
   esp32/rover_esp32/   THE ESP32 PROGRAM: open rover_esp32.ino in the Arduino IDE, edit WIFI_SSID / WIFI_PASS, upload (steps at the top of the file and in README.md,
                        including what to do when the IDE cannot see the board). The rest of esp32/ (espnow_bridge/, cam_espnow.h, lidar_test.ino) is optional
