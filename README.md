@@ -6,7 +6,7 @@
 One-time setup:
 
     pip install -r requirements.txt             # opencv-contrib, numpy, micromelon, pillow
-    python make_markers.py --size 0.05          # print markers_sheet.pdf at 100%; floor marker ID 8, follower tower: ID 0 flat on top + IDs 1-4 on the four faces
+    python make_markers.py --size 0.05          # print markers_sheet.pdf at 100%; floor marker ID 8, follower tower: ID 0 flat on top + IDs 1 left, 2 back, 3 right
     python tracker.py --list                    # find the external camera (press Y on the right one)
     python scan_arena.py --camera 1             # saves arena.json (tape + no-go square); or mark_arena.py to click the corners
 
@@ -59,7 +59,7 @@ It is also kinder than the full renderer for the hunter case: judge changes on `
 ---
 
 No robot control, no chessboard calibration.
-- FOLLOWER: a tower on the rover with a FLAT ArUco marker ID 0 on top and four faces IDs 1-4 -> position + yaw (`--markers post` = faces only, `--markers top` = one flat marker)
+- FOLLOWER: a tower on the rover with a FLAT ArUco marker ID 0 on top and faces ID 1 left, 2 back, 3 right -> position + yaw (`--markers tower` adds a front face, `--markers post` = four faces only, `--markers top` = one flat marker)
 - LEADER: a coloured balloon (colour only) -> position on the floor
 Outputs ONE number: the yaw to the leader (degrees the follower must turn to face it,
 + = left/CCW, - = right, 0 = pointing straight at it), with an overlay.
@@ -73,14 +73,15 @@ measure the black square with a ruler. Regenerate with `python make_markers.py` 
 - ID 8: the floor marker (15 cm), lying flat on the floor and TAPED DOWN: it is the world origin and every position is
   measured from it. The camera does NOT have to stay still: it re-solves the origin and angle from this marker on
   every frame, so keep it in view and make it big (a bigger floor marker gives a steadier origin).
-- **The tower layout (the default, `--markers tower`):** build a small tower on top of the rover.
+- **The tower layout (the default, `--markers tower3`):** build a small tower on top of the rover with markers 0 to 3.
   - **ID 0: FLAT on the very top of the tower**, lying horizontal, its TOP EDGE pointing to the rover's FRONT. This is the best marker when the camera looks from above.
-  - **IDs 1, 2, 3, 4 on the four side faces**, each upright and leaning BACK about 20 degrees (`TILT_DEG`): **ID 1 = FRONT, ID 2 = LEFT, ID 3 = BACK, ID 4 = RIGHT** (counter-clockwise seen from above).
-    These keep working when the camera is low and to the side, where the top marker is too slanted to read.
+  - **ID 1 = LEFT face, ID 2 = BACK face, ID 3 = RIGHT face**, each upright and leaning BACK about 20 degrees (`TILT_DEG`). There is no front face (the pin side).
+    The faces keep working when the camera is low and to the side, where the top marker is too slanted to read. Left and right are the rover's own left and right, looking forward.
   - Measure and set (Settings page or tracker.py): `TOP_MARKER_HEIGHT` = floor to the centre of the top marker, `MARKER_HEIGHT` = floor to the centre of the side faces, `POST_RADIUS` = rover centre to a face,
     and `TOP_MARKER_OFFSET` (tracker.py) = how far forward / left of the rover's centre the top marker's centre sits. All markers share one size, `MARKER_SIZE` (4 to 6 cm works).
   - Whatever markers are seen are averaged (flat ones weighted by how squarely they face the camera), so the heading survives a hand or a robot hiding one. Each face's two look-alike poses are told apart by which one leaves the
     rover standing upright; the flat marker's heading comes from the floor plane. Both removed the 20 to 30 degree heading flips.
+- `--markers tower`: the same plus a FRONT face, IDs 1 front, 2 left, 3 back, 4 right (five markers 0 to 4).
 - `--markers post`: the four faces only, IDs 0 front, 1 left, 2 back, 3 right (no top marker).
 - One flat marker instead (`--markers top`, ID 0): stick it flat on top of the rover (stiff card, matte) with its TOP EDGE pointing to the rover's FRONT, as big as the top allows.
 - Camera view: this works from above or from the side. The four-marker layout stays within about 1 to 4 degrees of heading error from the camera positions I tried in the simulator.
@@ -339,7 +340,7 @@ the values that differ from the defaults, and `follow.py` loads that file at sta
 
 ## Follower markers: the tower (default) and how to print them
 ```
-python make_markers.py --size 0.05      # tower: ID 0 (flat, top) and IDs 1 front, 2 left, 3 back, 4 right at 5 cm each, plus floor marker 8 at 15 cm -> markers_sheet.pdf, print at 100%
+python make_markers.py --size 0.05      # tower3: ID 0 (flat, top) and IDs 1 left, 2 back, 3 right at 5 cm each, plus floor marker 8 at 15 cm -> markers_sheet.pdf, print at 100%
 ```
 Set `MARKER_SIZE` (tracker.py or the Settings page) to the size you printed (default 5 cm), and measure `TOP_MARKER_HEIGHT`, `MARKER_HEIGHT` and `POST_RADIUS` (see above).
 `python follow.py --markers top` uses one flat marker instead (`python make_markers.py --markers top --size 0.08`).
