@@ -75,7 +75,7 @@ class Dashboard:
                         return self._send(500, json.dumps({"error": repr(e)}))
                 if path == "/frame.jpg":                       # one picture (the page polls this; no long-lived stream to hang)
                     q = self.path.split("?", 1)[1] if "?" in self.path else ""
-                    name = "onboard" if "cam=onboard" in q else ("mask-" + q.split("cam=mask-", 1)[1][:1] if "cam=mask-" in q else "external")
+                    name = "onboard" if "cam=onboard" in q else "external"
                     jpg = dash.frame(name)
                     if jpg is None:
                         return self._send(204, b"", "image/jpeg")

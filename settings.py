@@ -52,9 +52,6 @@ SETTINGS = [
     S("pipeline.CONTACT_CENTRE_M", G_GEOM, "Centre to centre in contact", "Distance between two rover centres when they touch.", lo=0.05, hi=0.3, step=0.005, unit="m"),
     # ---- camera / tracking
     S("tracker.MIN_BLOB_AREA", G_CAM, "Smallest balloon blob", "Colour blobs smaller than this many pixels are ignored.", kind="int", lo=10, hi=3000, step=10, unit="px"),
-    S("tracker.COLOR_TOL_H", G_CAM, "Colour tolerance: hue", "A clicked balloon colour accepts this much hue either side (0-179). Widen it if a balloon is lost when the light changes. Applies to the NEXT colour you set.", kind="int", lo=2, hi=40, step=1),
-    S("tracker.COLOR_TOL_S", G_CAM, "Colour tolerance: saturation", "How far the colour's saturation may differ (0-255). Pale or washed-out balloons (often yellow) need more.", kind="int", lo=10, hi=200, step=5),
-    S("tracker.COLOR_TOL_V", G_CAM, "Colour tolerance: brightness", "How far the brightness may differ (0-255). More = still found in shadow and glare.", kind="int", lo=10, hi=200, step=5),
     S("tracker.ALPHA", G_CAM, "Position smoothing", "1 = none (jittery), lower = steadier but slower to follow.", lo=0.05, hi=1.0, step=0.05),
     S("tracker.HOLD_S", G_CAM, "Hold a lost robot", "Keep the last position this long after the markers are lost.", lo=0.1, hi=2.0, step=0.05, unit="s"),
     S("tracker.FLOOR_ALPHA", G_CAM, "Floor frame smoothing", "1 = none, lower = steadier origin but lags a moving camera.", lo=0.05, hi=1.0, step=0.05),
