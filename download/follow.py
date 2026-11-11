@@ -632,6 +632,8 @@ def main(argv=None):
                 elif shared["tr"] is not None:
                     shared["tr"].set_opponent_color(slot, hh, ss, vv)
                 log("INFO", f"Slot {slot} colour set: H={hh:.0f} S={ss:.0f} V={vv:.0f}")
+                return {"ok": True, "hsv": [int(hh), int(ss), int(vv)]}
+            return {"error": "no camera picture to sample yet"}
         elif k == "quit":
             log("INFO", "Quit")
             stop.set()

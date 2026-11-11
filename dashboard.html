@@ -264,7 +264,8 @@ $("video").addEventListener("click", (e) => {
   const sc = Math.min(r.width / iw, r.height / ih), ox = (r.width - iw * sc) / 2, oy = (r.height - ih * sc) / 2;
   const x = (e.clientX - r.left - ox) / sc / iw, y = (e.clientY - r.top - oy) / sc / ih;
   if (x < 0 || x > 1 || y < 0 || y > 1) return;
-  post({cmd: "colour", slot: pickSlot, cam: camSel, x, y});
+  const slotPicked = pickSlot;
+  post({cmd: "colour", slot: pickSlot, cam: camSel, x, y}).then((r) => { camMsg(r.error ? r.error : "Slot " + slotPicked + " set from your click: hue " + r.hsv[0] + ", saturation " + r.hsv[1] + ", brightness " + r.hsv[2] + ". Press Mask to see what it now matches."); });
   pickSlot = null; $("video").classList.remove("pick"); $("pickHint").hidden = true;
 });
 
