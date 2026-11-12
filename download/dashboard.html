@@ -126,6 +126,7 @@ input[type=number],input[type=text]{min-height:44px;width:84px;padding:0 10px;ba
      <div class="row" style="gap:8px;align-items:baseline"><span class="small mute">Yaw to target</span><span class="mono" id="yawBig" style="font-size:30px;font-weight:500">-</span></div>
      <div class="row" style="gap:8px;align-items:baseline"><span class="small" style="color:var(--path)">Next waypoint</span><span class="mono" id="wpYaw" style="font-size:18px;font-weight:500;color:var(--path)">-</span></div>
     </div>
+    <div id="pickBanner" hidden style="position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:6;padding:12px 18px;background:#f2c94c;color:#0e1217;font-weight:700;font-size:18px;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.6);pointer-events:none;text-align:center"></div>
     <span class="vtr" id="behind" hidden></span>
     <span class="vbl mono small mute" id="camInfo"></span>
    </div>
@@ -278,8 +279,9 @@ $("video").addEventListener("click", (e) => {
   const sc = Math.min(r.width / iw, r.height / ih), ox = (r.width - iw * sc) / 2, oy = (r.height - ih * sc) / 2;
   const x = (e.clientX - r.left - ox) / sc / iw, y = (e.clientY - r.top - oy) / sc / ih;
   if (x < 0 || x > 1 || y < 0 || y > 1) return;
-  post({cmd: "colour", slot: pickSlot, cam: camSel, x, y});
-  pickSlot = null; $("video").classList.remove("pick"); $("pickHint").hidden = true;
+  const slotPicked = pickSlot;
+  post({cmd: "colour", slot: pickSlot, cam: camSel, x, y}).then((r) => { if (r && r.hsv) { camMsg("Slot " + slotPicked + " set from your click: hue " + r.hsv[0] + ", saturation " + r.hsv[1] + ", brightness " + r.hsv[2] + ".");  toast("Slot " + slotPicked + " colour set (hue " + r.hsv[0] + ")", true); } });
+  pickSlot = null; $("video").classList.remove("pick"); $("pickHint").hidden = true; $("pickBanner").hidden = true;
 });
 
 /* ---------- picture: one request at a time ---------- */
@@ -452,12 +454,44 @@ function renderTiming(s) {
   else { b.className = "banner"; b.textContent = "No chaser."; }
 }
 
+/* The buttons are built ONCE and only their text is updated: a button that is rebuilt every 150 ms loses a click whenever the page refreshes
+   between the mouse going down and coming up (that made "Set colour" and the target buttons seem not to register). */
+function startPick(slot) {
+  pickSlot = pickSlot === slot ? null : slot;
+  $("video").classList.toggle("pick", !!pickSlot); $("pickHint").hidden = !pickSlot;
+  $("pickBanner").hidden = !pickSlot; $("pickBanner").textContent = pickSlot ? "Click the middle of the balloon for slot " + pickSlot : "";
+  if (pickSlot) $("video").scrollIntoView({behavior: "smooth", block: "center"});     // the picture is far above these buttons
+  updatePickButtons();
+}
+function updatePickButtons() {
+  document.querySelectorAll("#slots button[data-slot]").forEach((b) => {
+    const on = pickSlot === b.dataset.slot, txt = on ? "Click the balloon" : "Set colour";
+    if (b.textContent !== txt) b.textContent = txt;
+    b.classList.toggle("on", on);
+  });
+}
 function renderSlots(s) {
-  $("slots").innerHTML = Object.entries(s.slots).map(([n, d]) => '<div class="slot"><span class="sw" style="background:' + d.swatch + '"></span><div style="flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-weight:600">Slot ' + n + ' <span class="mono mute small" style="font-weight:400">' + esc(d.hue) + '</span></span><span class="small mute">' + esc(d.status) + '</span></div><button class="btn' + (pickSlot === n ? " on" : "") + '" data-slot="' + n + '" type="button" style="font-size:13px">' + (pickSlot === n ? "Click the balloon" : "Set colour") + "</button></div>").join("");
-  $("slots").querySelectorAll("button").forEach((b) => { b.onclick = () => { pickSlot = pickSlot === b.dataset.slot ? null : b.dataset.slot; $("video").classList.toggle("pick", !!pickSlot); $("pickHint").hidden = !pickSlot; if (pickSlot && camSel === "onboard") $("pickHint").textContent = "Click the balloon in the onboard picture to set its colour (this sets the colour for that camera only)."; renderSlots(S); }; });
-  const pref = s.plan ? s.plan.pref : "nearest";
-  $("targets").innerHTML = ["nearest", "A", "B", "C"].map((n) => '<button class="btn' + (pref === n ? " on" : "") + '" data-t="' + n + '" type="button">' + (n === "nearest" ? "Nearest" : n) + "</button>").join("");
-  $("targets").querySelectorAll("button").forEach((b) => { b.onclick = () => post({cmd: "target", name: b.dataset.t}); });
+  const names = Object.keys(s.slots), box = $("slots");
+  if (box.dataset.names !== names.join(",")) {
+    box.dataset.names = names.join(",");
+    box.innerHTML = names.map((n) => '<div class="slot" data-row="' + n + '"><span class="sw" data-sw="' + n + '"></span><div style="flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-weight:600">Slot ' + n + ' <span class="mono mute small" style="font-weight:400" data-hue="' + n + '"></span></span><span class="small mute" data-stat="' + n + '"></span></div><button class="btn" data-slot="' + n + '" type="button" style="font-size:13px">Set colour</button></div>').join("");
+    box.querySelectorAll("button[data-slot]").forEach((b) => { b.onclick = () => startPick(b.dataset.slot); });
+  }
+  names.forEach((n) => {
+    const d = s.slots[n];
+    const sw = box.querySelector('[data-sw="' + n + '"]'), hu = box.querySelector('[data-hue="' + n + '"]'), st = box.querySelector('[data-stat="' + n + '"]');
+    if (sw.style.background !== d.swatch) sw.style.background = d.swatch;
+    if (hu.textContent !== d.hue) hu.textContent = d.hue;
+    if (st.textContent !== d.status) st.textContent = d.status;
+  });
+  updatePickButtons();
+  const pref = s.plan ? s.plan.pref : "nearest", tg = $("targets");
+  if (!tg.dataset.built) {
+    tg.dataset.built = "1";
+    tg.innerHTML = ["nearest", "A", "B", "C"].map((n) => '<button class="btn" data-t="' + n + '" type="button">' + (n === "nearest" ? "Nearest" : n) + "</button>").join("");
+    tg.querySelectorAll("button").forEach((b) => { b.onclick = () => post({cmd: "target", name: b.dataset.t}); });
+  }
+  tg.querySelectorAll("button").forEach((b) => b.classList.toggle("on", pref === b.dataset.t));
 }
 
 function renderLog(s) {
